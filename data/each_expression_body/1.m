@@ -1,0 +1,1 @@
+[Year_Num] >= 2014 and [Year_Num] <= Date.Year(DateTime.LocalNow())

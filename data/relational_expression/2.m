@@ -1,0 +1,1 @@
+[Year_Num] <= Date.Year(DateTime.LocalNow())
