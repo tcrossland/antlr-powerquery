@@ -5,24 +5,28 @@ channels { COMMENTS_CHANNEL }
 @lexer::members
 {
   int brackets = 0;
-  public void openBracket() { brackets += 1; System.out.println(getText() + " brackets " + brackets); }
-  public void closeBracket() { brackets -= 1; System.out.println(getText() + " brackets " + brackets); }
-  public void eq() { System.out.println(getText() + " EQ brackets " + brackets); if (brackets > 0) popMode(); }
-  public void comma() { System.out.println(getText() + " COMMA brackets " + brackets); if (brackets > 0) pushMode(1); }
+  public void openBracket()  { brackets += 1; }
+  public void closeBracket() { brackets -= 1; }
+  public void eq()           { if (brackets > 0 && _mode != DEFAULT_MODE) popMode(); else trace(""); }
+  public void comma()        { if (brackets > 0) pushMode(1); else trace(""); }
+
+  void trace(String s) {
+    // System.out.println("LINE:" + getLine() + " TEXT: " + getText() + " STATE: brackets=" + brackets + s);
+  }
 
   @Override
   public int popMode() {
-	int m = _modeStack.isEmpty() ? DEFAULT_MODE : super.popMode();
-	System.out.println(getText() + " popMode " + m);
-    return m;
+    if (_modeStack.isEmpty()) { trace(" NOPOP"); return DEFAULT_MODE; }
+	else { int p = _mode; int m = super.popMode(); trace(" POP " + p + " -> " + m); return m; }
   }
 
   @Override
-  public void pushMode(int mode) {
-	System.out.println(getText() + " pushMode " + mode);
-	super.pushMode(mode);
+  public void pushMode(int m) {
+    trace(" PUSH " + m);
+    super.pushMode(m);
   }
 }
+
 // 2.4 Whitespace
 WHITESPACES:           (Whitespace | NewLine)+  -> channel(HIDDEN);
 
@@ -108,7 +112,7 @@ AMP:                    '&';
 OPEN_PARENS:            '(';
 CLOSE_PARENS:           ')';
 OPEN_BRACKET:           '[' { openBracket(); } -> pushMode(FIELD);
-CLOSE_BRACKET:          ']' { closeBracket(); } -> popMode;
+CLOSE_BRACKET:          ']' { closeBracket(); };
 OPEN_BRACE:             '{';
 CLOSE_BRACE:            '}';
 AT:                     '@';
