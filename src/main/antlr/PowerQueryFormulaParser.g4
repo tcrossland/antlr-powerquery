@@ -2,314 +2,248 @@ parser grammar PowerQueryFormulaParser;
 
 options { tokenVocab=PowerQueryFormulaLexer; }
 
-// Section Documents
-
-section_document: section;
+sectionDocument: section;
 
 section
-	: literal_attributes? SECTION section_name? SEMICOLON section_member*;
+	: literalAttributes? SECTION IDENTIFIER? SEMICOLON sectionMember*;
 
-section_name: IDENTIFIER;
+sectionMember
+	: literalAttributes? SHARED? IDENTIFIER EQ expression SEMICOLON;
 
-section_member
-	: literal_attributes? SHARED? section_member_name EQ expression SEMICOLON;
-
-section_member_name: IDENTIFIER;
-
-// Expression Documents
-
-expression_document: expression;
+expressionDocument: expression;
 
 expression
-	: logical_expression
-	| each_expression
-	| function_expression
-	| let_expression
-	| if_expression
-	| error_raising_expression
-	| error_handling_expression
+	: logicalExpression
+	| eachExpression
+	| functionExpression
+	| letExpression
+	| ifExpression
+	| errorRaisingExpression
+	| errorHandlingExpression
 	;
 
-// Logical Expressions
-
-logical_expression
-	: logical_or_expression
-	| logical_and_expression
+logicalExpression
+	: logicalOrExpression
+	| logicalAndExpression
 	;
 
-logical_or_expression
-	: logical_and_expression (OR logical_and_expression)*
+logicalOrExpression
+	: logicalAndExpression (OR logicalAndExpression)*
 	;
 
-logical_and_expression
-	: is_expression (AND is_expression)*
+logicalAndExpression
+	: isExpression (AND isExpression)*
 	;
 
-// Is expression
-
-is_expression
-	: as_expression (IS nullable_primitive_type)*
+isExpression
+	: asExpression (IS nullablePrimitiveType)*
 	;
 
-nullable_primitive_type
-	: NULLABLE? primitive_type
+nullablePrimitiveType
+	: NULLABLE? primitiveType
 	;
 
-// As expression
-
-as_expression // A1
-	: equality_expression as_nullable_primitive_type?
+asExpression
+	: equalityExpression (AS nullablePrimitiveType)*
 	;
 
-as_nullable_primitive_type
-	: AS nullable_primitive_type
+equalityExpression
+	: relationalExpression ((EQ | NE) relationalExpression)*
 	;
 
-// Equality expression
-
-equality_expression // A2
-	: relational_expression op_equality_expression?
+relationalExpression
+	: additiveExpression ((LT | GT | LE | GE) additiveExpression)*
 	;
 
-op_equality_expression
-	: (EQ | NE) equality_expression
+additiveExpression
+	: multiplicativeExpression ((PLUS | MINUS | AMP) multiplicativeExpression)*
 	;
 
-relational_expression // A3
-	: additive_expression op_relational_expression?
+multiplicativeExpression
+	: metaExpression ((STAR | DIV) metaExpression)*
 	;
 
-op_relational_expression
-	: (LT | GT | LE | GE) relational_expression
+metaExpression
+	: unaryExpression (META unaryExpression)*
 	;
 
-additive_expression // A4
-	: multiplicative_expression op_additive_expression?
+unaryExpression
+	: typeExpression
+	| PLUS unaryExpression
+	| MINUS unaryExpression
+	| NOT unaryExpression
 	;
 
-op_additive_expression
-	: (PLUS | MINUS | AMP) additive_expression
+primaryExpression
+	: anyLiteral                                                      #literalExpression
+	| OPEN_BRACE itemList? CLOSE_BRACE                                #listExpression
+	| OPEN_BRACKET fieldList? CLOSE_BRACKET                           #recordExpression
+	| IDENTIFIER                                                      #identifierExpression
+	| AT IDENTIFIER                                                   #identifierExpression
+	| IDENTIFIER BANG IDENTIFIER                                      #sectionAccessExpression
+	| OPEN_PARENS expression CLOSE_PARENS                             #parenthesizedExpression
+	| fieldAccessExpression                                           #primaryExpression_fieldAccessExpression
+	| primaryExpression OPEN_BRACE itemSelector CLOSE_BRACE QUESTION? #itemAccessExpression
+	| primaryExpression OPEN_PARENS argumentList? CLOSE_PARENS        #invokeExpression
+	| DOT_DOT_DOT                                                     #notImplementedExpression
+	| intrinsicFunctionExpression                                     #builtinFunctionExpression
 	;
 
-multiplicative_expression // A5
-	: metadata_expression op_multiplicative_expression?
-	;
-
-op_multiplicative_expression
-	: (STAR | DIV) multiplicative_expression
-	;
-
-metadata_expression // A6
-	: unary_expression meta_unary_expression?
-	;
-
-meta_unary_expression
-	: META unary_expression
-	;
-
-unary_expression
-	: type_expression
-	| PLUS unary_expression
-	| MINUS unary_expression
-	| NOT unary_expression
-	;
-
-primary_expression
-	: any_literal #literal_expression
-	| OPEN_BRACE item_list? CLOSE_BRACE #list_expression
-	| OPEN_BRACKET field_list? CLOSE_BRACKET #primary_expression_record_expression
-	| IDENTIFIER #identifier_expression
-	| AT IDENTIFIER #identifier_expression
-	| IDENTIFIER BANG IDENTIFIER #section_access_expression
-	| OPEN_PARENS expression CLOSE_PARENS #parenthesized_expression
-	| field_access_expression_ #primary_expression_field_access_expression
-	| primary_expression OPEN_BRACE item_selector CLOSE_BRACE QUESTION? #primary_expression_item_access_expression
-	| primary_expression OPEN_PARENS argument_list? CLOSE_PARENS #primary_expression_invoke_expression
-	| DOT_DOT_DOT #not_implemented_expression
-	| builtin_function_expression #primary_expression_table_builtin
-	;
-
-builtin_function_expression
+intrinsicFunctionExpression
 	: HASH_TABLE
 	;
 
-invoke_expression
-	: primary_expression OPEN_PARENS argument_list? CLOSE_PARENS
-	;
-/*
-primary_expression_
-	: OPEN_BRACE primary_expression_OPEN_BRACE
-	| OPEN_BRACE primary_expression_OPEN_BRACKET
-	| IDENTIFIER primary_expression_IDENTIFIER
-	| AT primary_expression_AT
-	| OPEN_PARENS primary_expression_OPEN_PARENS
-	| DOT_DOT_DOT primary_expression_DOT_DOT_DOT
-	// field_access_expression_
-	// any_literal
-	;
-primary_expression_any_literal
-	: // epsilon
-	;
-primary_expression_OPEN_BRACE: item_list? CLOSE_BRACE;
-primary_expression_OPEN_BRACKET: field_list? CLOSE_BRACKET;
-primary_expression_IDENTIFIER
-	: // epsilon
-	| BANG IDENTIFIER;
-primary_expression_AT: IDENTIFIER;
-primary_expression_OPEN_PARENS: expression CLOSE_PARENS;
-primary_expression_field_access_expression_
-	: // epsilon
-	;
-primary_expression_primary_expression
-	: OPEN_BRACE item_selector CLOSE_BRACE QUESTION?
-	| OPEN_PARENS argument_list? CLOSE_PARENS;
-primary_expression_DOT_DOT_DOT
-	: // epsilon
-	;
- */
-
-field_access_expression_
-	: (TEXT_LITERAL | NUMBER_LITERAL) field_access_expression_LITERAL
-	| OPEN_BRACE field_access_expression_OPEN_BRACE
-	| OPEN_BRACKET field_access_expression_OPEN_BRACKET
-	| IDENTIFIER field_access_expression_IDENTIFIER
-	| AT field_access_expression_AT
-	| OPEN_PARENS field_access_expression_OPEN_PARENS
-	| DOT_DOT_DOT field_access_expression_DOT_DOT_DOT
+// Left corner transform has been applied to field-access-expression/primary-expression to remove mutually left recursive rules
+fieldAccessExpression
+	: (TEXT_LITERAL | NUMBER_LITERAL) fieldAccessExpression_LITERAL  #fieldSelectionOrProjection
+	| OPEN_BRACE fieldAccessExpression_OPEN_BRACE                    #fieldSelectionOrProjection
+	| OPEN_BRACKET fieldAccessExpression_OPEN_BRACKET                #implicitTargetSelectionOrProjection
+	| IDENTIFIER fieldAccessExpression_IDENTIFIER                    #fieldSelectionOrProjection
+	| AT fieldAccessExpression_AT                                    #fieldSelectionOrProjection
+	| OPEN_PARENS fieldAccessExpression_OPEN_PARENS                  #fieldSelectionOrProjection
+	| DOT_DOT_DOT fieldAccessExpression_DOT_DOT_DOT                  #fieldSelectionOrProjection
 	;
 
-field_access_expression_primary_expression
-	: field_selector #field_access_expression_primary_expression_field_selection
-	| OPEN_BRACKET required_selector_list CLOSE_BRACKET QUESTION? #field_access_expression_primary_expression_projection
-	| OPEN_BRACE item_selector CLOSE_BRACE QUESTION? field_access_expression_primary_expression  #field_access_expression_primary_expression_item_access_expression
-	| OPEN_PARENS argument_list? CLOSE_PARENS field_access_expression_primary_expression #field_access_expression_primary_expression_invoke_expression
+fieldAccessExpression_primaryExpression
+	: fieldSelector                                                                           #fieldSelection // fieldSelection
+	| OPEN_BRACKET requiredSelectorList CLOSE_BRACKET QUESTION?                               #projection     // projection
+	| OPEN_BRACE itemSelector CLOSE_BRACE QUESTION? fieldAccessExpression_primaryExpression   #fieldAccessExpression_primaryExpression_itemAccessExpression // itemAccessExpression...
+	| OPEN_PARENS argumentList? CLOSE_PARENS fieldAccessExpression_primaryExpression          #fieldAccessExpression_primaryExpression_invokeExpression     // invokeExpression...
 	;
 
-field_access_expression_field_selector: /* epsilon */;
-// X: [primary_expression, field_selector]
-field_access_expression_LITERAL: field_access_expression_primary_expression;
-field_access_expression_OPEN_BRACE: item_list? CLOSE_BRACE field_access_expression_primary_expression;
-field_access_expression_OPEN_BRACKET
-	: field_list CLOSE_BRACKET field_access_expression_primary_expression
-	| field_name CLOSE_BRACKET field_access_expression_required_field_selector
-	| field_name CLOSE_BRACKET QUESTION field_access_expression_optional_field_selector
+// X: [primaryExpression, fieldSelector]
+fieldAccessExpression_LITERAL
+	: fieldAccessExpression_primaryExpression                                                 // literalExpression...
 	;
-field_access_expression_IDENTIFIER
-	: field_access_expression_primary_expression
-	| BANG IDENTIFIER field_access_expression_primary_expression
+fieldAccessExpression_OPEN_BRACE
+	: itemList? CLOSE_BRACE fieldAccessExpression_primaryExpression                           // listExpression...
 	;
-field_access_expression_AT: IDENTIFIER field_access_expression_primary_expression;
-field_access_expression_OPEN_PARENS: expression CLOSE_PARENS field_access_expression_primary_expression;
-field_access_expression_field_access_expression: field_access_expression_primary_expression;
-field_access_expression_DOT_DOT_DOT: field_access_expression_primary_expression;
-// corners: [field_selector, field_access_expression, required_field_selector, optional_field_selector]
-field_access_expression_required_field_selector: field_access_expression_field_selector;
-field_access_expression_optional_field_selector: field_access_expression_field_selector;
-// corners: [required_field_selector, optional_field_selector]
+fieldAccessExpression_OPEN_BRACKET
+	: fieldList CLOSE_BRACKET fieldAccessExpression_primaryExpression                         #recordExpression_fieldAccess // recordExpression...
+	| fieldName CLOSE_BRACKET QUESTION?                                                       #implicitTargetFieldSelection // requiredFieldSelector/optionalFieldSelector
+	;
+fieldAccessExpression_IDENTIFIER
+	: fieldAccessExpression_primaryExpression                                                 // identifierExpression...
+	| BANG IDENTIFIER fieldAccessExpression_primaryExpression                                 // sectionAccessExpression...
+	;
+fieldAccessExpression_AT
+	: IDENTIFIER fieldAccessExpression_primaryExpression                                      // identifierExpression...
+	;
+fieldAccessExpression_OPEN_PARENS
+	: expression CLOSE_PARENS fieldAccessExpression_primaryExpression                         // parenthesizedExpresion...
+	;
+fieldAccessExpression_fieldAccessExpression
+	: fieldAccessExpression_primaryExpression                                                 // fieldAccessExpression...
+	;
+fieldAccessExpression_DOT_DOT_DOT
+	: fieldAccessExpression_primaryExpression                                                 // notImplementedExpression...
+	;
+// corners: [fieldSelector, field_access_expression, requiredFieldSelector, optionalFieldSelector]
+// corners: [requiredFieldSelector, optionalFieldSelector]
 
-argument_list
+argumentList
 	: expression (COMMA expression)*
 	;
 
-item_list
+itemList
 	: item (COMMA item)*
 	;
 
 item
-	: expression
-	| expression DOT_DOT expression
+	: expression                    # singleItem
+	| expression DOT_DOT expression # sequence
 	;
 
-field_list
+fieldList
 	: field (COMMA field)*
 	;
 
-field: field_name EQ expression;
+field: fieldName EQ expression;
 
-field_name: GENERALIZED_IDENTIFIER | IDENTIFIER;
+fieldName: GENERALIZED_IDENTIFIER | IDENTIFIER;
 
-item_selector: expression;
+itemSelector: expression;
 
-field_selector
-	: required_field_selector
-	| optional_field_selector
+fieldSelector
+	: requiredFieldSelector
+	| optionalFieldSelector
 	;
 
-required_field_selector: OPEN_BRACKET field_name CLOSE_BRACKET;
-optional_field_selector: OPEN_BRACKET field_name CLOSE_BRACKET QUESTION;
+requiredFieldSelector: OPEN_BRACKET fieldName CLOSE_BRACKET;
+optionalFieldSelector: OPEN_BRACKET fieldName CLOSE_BRACKET QUESTION;
 
-required_selector_list
-	: required_field_selector (COMMA required_field_selector)*
+requiredSelectorList
+	: requiredFieldSelector (COMMA requiredFieldSelector)*
 	;
 
-function_expression
-	: OPEN_PARENS parameter_list? CLOSE_PARENS return_type? ARROW function_body;
-function_body: expression;
-parameter_list
-	: fixed_parameter_list (COMMA optional_parameter_list)?
-	| optional_parameter_list
+functionExpression
+	: OPEN_PARENS parameterList? CLOSE_PARENS returnType? ARROW functionBody;
+functionBody: expression;
+parameterList
+	: fixedParameterList (COMMA optionalParameterList)?
+	| optionalParameterList
 	;
-fixed_parameter_list
+fixedParameterList
 	: parameter (COMMA parameter)*
 	;
 parameter
-	: parameter_name parameter_type?
+	: parameterName parameterType?
 	;
-parameter_name
+parameterName
 	: IDENTIFIER
 	;
-parameter_type
+parameterType
 	: assertion
 	;
-return_type
+returnType
 	: assertion
 	;
 assertion
 	: AS type
 	;
-optional_parameter_list
-	: optional_parameter (COMMA optional_parameter)*
+optionalParameterList
+	: optionalParameter (COMMA optionalParameter)*
 	;
-optional_parameter
+optionalParameter
 	: OPTIONAL parameter
 	;
-each_expression
-	: EACH each_expression_body
+eachExpression
+	: EACH eachExpressionBody
 	;
-each_expression_body: function_body;
-let_expression
-	: LET variable_list IN expression
+eachExpressionBody: functionBody;
+letExpression
+	: LET variableList IN expression
 	;
-variable_list
+variableList
 	: variable (COMMA variable)*
 	;
-variable: variable_name EQ expression;
-variable_name: GENERALIZED_IDENTIFIER | IDENTIFIER;
+variable: variableName EQ expression;
+variableName: GENERALIZED_IDENTIFIER | IDENTIFIER;
 
-if_expression
-	: IF if_condition THEN true_expression ELSE false_expression
+ifExpression
+	: IF ifCondition THEN trueExpression ELSE falseExpression
 	;
-if_condition: expression;
-true_expression: expression;
-false_expression: expression;
+ifCondition: expression;
+trueExpression: expression;
+falseExpression: expression;
 
-type_expression
-	: TYPE primary_type
-	| primary_expression
+typeExpression
+	: TYPE primaryType
+	| primaryExpression
 	;
 type
 	: OPEN_PARENS expression CLOSE_PARENS
-	| primary_type
+	| primaryType
 	;
-primary_type
-	: table_type
-	| primitive_type
-	| record_type
-	| list_type
-	| function_type
-	| nullable_type
+primaryType
+	: tableType
+	| primitiveType
+	| recordType
+	| listType
+	| functionType
+	| nullableType
 	;
-primitive_type
+primitiveType
 	: ANY
 	| ANYNONNULL
 	| BINARY
@@ -328,91 +262,96 @@ primitive_type
 	| TEXT
 	| TYPE
 	;
-record_type
-	: OPEN_BRACKET open_record_marker CLOSE_BRACKET
-	| OPEN_BRACKET field_specification_list CLOSE_BRACKET
-	| OPEN_BRACKET field_specification_list COMMA open_record_marker CLOSE_BRACKET
+recordType
+	: OPEN_BRACKET openRecordMarker CLOSE_BRACKET
+	| OPEN_BRACKET fieldSpecificationList CLOSE_BRACKET
+	| OPEN_BRACKET fieldSpecificationList COMMA openRecordMarker CLOSE_BRACKET
 	;
-field_specification_list
-	: field_specification (COMMA field_specification)*
+fieldSpecificationList
+	: fieldSpecification (COMMA fieldSpecification)*
 	;
-field_specification
-	: IDENTIFIER field_type_specification?
-	| GENERALIZED_IDENTIFIER field_type_specification?
-	| OPTIONAL IDENTIFIER field_type_specification?
-	| OPTIONAL GENERALIZED_IDENTIFIER field_type_specification?
+fieldSpecification
+	: IDENTIFIER fieldTypeSpecification?
+	| GENERALIZED_IDENTIFIER fieldTypeSpecification?
+	| OPTIONAL IDENTIFIER fieldTypeSpecification?
+	| OPTIONAL GENERALIZED_IDENTIFIER fieldTypeSpecification?
 	;
-field_type_specification
-	: EQ field_type
+fieldTypeSpecification
+	: EQ fieldType
 	;
-field_type
+fieldType
 	: type
 	| IDENTIFIER;
-open_record_marker: DOT_DOT_DOT;
-list_type: OPEN_BRACE item_type CLOSE_BRACE;
-item_type: type;
-function_type: FUNCTION OPEN_PARENS parameter_specification_list? CLOSE_PARENS return_type;
-parameter_specification_list
-	: required_parameter_specification_list
-	| required_parameter_specification_list COMMA optional_parameter_specification_list
-	| optional_parameter_specification_list
+openRecordMarker: DOT_DOT_DOT;
+listType: OPEN_BRACE itemType CLOSE_BRACE;
+itemType: type;
+functionType: FUNCTION OPEN_PARENS parameterSpecificationList? CLOSE_PARENS returnType;
+parameterSpecificationList
+	: requiredParameterSpecificationList
+	| requiredParameterSpecificationList COMMA optionalParameterSpecificationList
+	| optionalParameterSpecificationList
 	;
-required_parameter_specification_list
-	: parameter_specification
+requiredParameterSpecificationList
+	: parameterSpecification (COMMA parameterSpecification)*
 	;
-optional_parameter_specification_list
-	: optional_parameter_specification
-	| optional_parameter_specification COMMA optional_parameter_specification_list
+optionalParameterSpecificationList
+	: optionalParameterSpecification (COMMA optionalParameterSpecification)*
 	;
-optional_parameter_specification
-	: OPTIONAL parameter_specification
+optionalParameterSpecification
+	: OPTIONAL parameterSpecification
 	;
-parameter_specification
-	: parameter_name parameter_type
+parameterSpecification
+	: parameterName parameterType
 	;
-table_type
-	: TABLE row_type
+tableType
+	: TABLE rowType
 	;
-row_type
-	: OPEN_BRACKET field_specification_list CLOSE_BRACKET
+rowType
+	: OPEN_BRACKET fieldSpecificationList CLOSE_BRACKET
 	;
-nullable_type
+nullableType
 	: NULLABLE type
 	;
 
-error_raising_expression
+errorRaisingExpression
 	: ERROR expression
 	;
-error_handling_expression
-	: TRY protected_expression otherwise_clause?
+errorHandlingExpression
+	: TRY protectedExpression otherwiseClause?
 	;
-protected_expression: expression;
-otherwise_clause: OTHERWISE default_expression;
-default_expression: expression;
+protectedExpression: expression;
+otherwiseClause: OTHERWISE defaultExpression;
+defaultExpression: expression;
 
-literal_attributes: record_literal;
-record_literal: OPEN_BRACKET literal_field_list? CLOSE_BRACKET;
-literal_field_list
-	: literal_field
-	| literal_field COMMA literal_field_list;
-literal_field
-	: field_name EQ any_literal
+literalAttributes: recordLiteral;
+recordLiteral: OPEN_BRACKET literalFieldList? CLOSE_BRACKET;
+literalFieldList
+	: literalField (COMMA literalField)*;
+literalField
+	: fieldName EQ anyLiteral
 	;
-list_literal
-	: OPEN_BRACE literal_item_list CLOSE_BRACE
+listLiteral
+	: OPEN_BRACE literalItemList CLOSE_BRACE
 	;
-literal_item_list
-	: any_literal COMMA literal_item_list
+literalItemList
+	: anyLiteral (COMMA anyLiteral)*
 	;
-any_literal
-	: record_literal
-	| list_literal
-	| logical_literal
-	| NUMBER_LITERAL
-	| TEXT_LITERAL
-	| NULL;
+anyLiteral
+	: recordLiteral
+	| listLiteral
+	| logicalLiteral 
+	| numberLiteral
+	| textLiteral
+	| nullLiteral
+	;
 
-logical_literal
+numberLiteral: NUMBER_LITERAL;
+
+textLiteral: TEXT_LITERAL;
+
+nullLiteral: NULL;
+
+logicalLiteral
 	: TRUE
 	| FALSE
 	;
