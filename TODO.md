@@ -10,3 +10,4 @@
 # Done
 
 - [x] ANTLR lexer and parser grammars
+- [x] Parse tree visitor and model
