@@ -48,19 +48,42 @@ asExpression
 	;
 
 equalityExpression
-	: relationalExpression ((EQ | NE) relationalExpression)*
+	: relationalExpression (equalityOperator relationalExpression)*
+	;
+
+equalityOperator
+	: EQ
+	| NE
 	;
 
 relationalExpression
-	: additiveExpression ((LT | GT | LE | GE) additiveExpression)*
+	: additiveExpression (relationalOperator additiveExpression)*
+	;
+
+relationalOperator
+	: LT
+	| GT
+	| LE
+	| GE
 	;
 
 additiveExpression
-	: multiplicativeExpression ((PLUS | MINUS | AMP) multiplicativeExpression)*
+	: multiplicativeExpression (additiveOperator multiplicativeExpression)*
+	;
+
+additiveOperator
+	: PLUS
+	| MINUS
+	| AMP
 	;
 
 multiplicativeExpression
-	: metaExpression ((STAR | DIV) metaExpression)*
+	: metaExpression (multiplicativeOperator metaExpression)*
+	;
+
+multiplicativeOperator
+	: STAR
+	| DIV
 	;
 
 metaExpression
@@ -69,9 +92,13 @@ metaExpression
 
 unaryExpression
 	: typeExpression
-	| PLUS unaryExpression
-	| MINUS unaryExpression
-	| NOT unaryExpression
+	| unaryOperator unaryExpression
+	;
+
+unaryOperator
+	: PLUS
+	| MINUS
+	| NOT
 	;
 
 primaryExpression

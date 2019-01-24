@@ -9,31 +9,34 @@ sealed abstract class TypeNode extends Node
 
 sealed abstract class Expression extends Node
 
-case class LogicalOrExpression(expressions: List[Expression]) extends Expression
+case class LogicalOrExpression(e1: Expression, e2: Expression) extends Expression
 
-case class LogicalAndExpression(expressions: List[Expression]) extends Expression
+case class LogicalAndExpression(e1: Expression, e2: Expression) extends Expression
 
-case class IsExpression(expression: Expression) extends Expression
+case class IsExpression(expression: Expression, is: Type) extends Expression
 
-case class AsExpression(expression: Expression) extends Expression
+case class AsExpression(expression: Expression, as: Type) extends Expression
 
-case class EqualityExpression(expressions: List[Expression]) extends Expression
+case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
 
-case class RelationalExpression(expressions: List[Expression]) extends Expression
+case class RelationalExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
 
-case class AdditiveExpression(expressions: List[Expression]) extends Expression
+case class AdditiveExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
 
-case class MultiplicativeExpression(expressions: List[Expression]) extends Expression
+case class MultiplicativeExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
 
-case class MetaExpression(expressions: List[Expression]) extends Expression
+case class MetaExpression(expression: Expression, meta: Expression) extends Expression
 
-case class UnaryExpression(expression: Expression) extends Expression
+case class UnaryExpression(operator: Operator, expression: Expression) extends Expression
 
 case class IdentifierExpression(identifier: Identifier) extends Expression
 
 case class SectionAccessExpression(section: Identifier, identifier: Identifier) extends Expression
 
-case class ItemSelection(expression: Expression, itemSelector: Expression, optional: Boolean) extends Expression
+sealed abstract class ItemSelectionBase extends Expression
+
+case class ItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase
+case class OptionalItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase
 
 case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression
 
@@ -63,13 +66,21 @@ case class SectionMember(name: Identifier, expression: Expression, shared: Boole
 
 case class Section(name: Option[Identifier], members: List[SectionMember], attributes: Option[RecordLiteral]) extends Node
 
-case class FieldSelector(name: Identifier, optional: Boolean = false) extends Node
+sealed abstract class FieldSelector extends Node
+
+case class RequiredFieldSelector(name: Identifier) extends FieldSelector
+
+case class OptionalFieldSelector(name: Identifier) extends FieldSelector
 
 case class FieldSelection(expression: Expression, selection: Node) extends Expression
 
 case class ImplicitTargetFieldSelection(selection: Node) extends Expression
 
-case class Projection(selectors: SelectorList, optional: Boolean) extends Node
+sealed abstract class Projection extends Node
+
+case class RequiredProjection(selectors: SelectorList) extends Projection
+
+case class OptionalProjection(selectors: SelectorList) extends Projection
 
 case class SelectorList(selectors: List[Node]) extends Node
 
@@ -89,6 +100,8 @@ case class OptionalParameterList(parameters: List[Parameter]) extends Node
 case class Parameter(name: Identifier, parameterType: Option[Type]) extends Node
 
 sealed abstract class Type extends Expression
+
+case class NullableType(t: Type) extends Type
 
 case class ExpressionType(expression: Expression) extends Type
 
@@ -115,3 +128,19 @@ case object RecordType extends Type
 case object TableType extends Type
 case object TextType extends Type
 case object TypeType extends Type
+
+sealed abstract class Operator extends Node
+
+case object Equal extends Operator
+case object NotEqual extends Operator
+case object LessThan extends Operator
+case object GreaterThan extends Operator
+case object LessOrEqual extends Operator
+case object GreaterOrEqual extends Operator
+case object Plus extends Operator
+case object Minus extends Operator
+case object Times extends Operator
+case object Divide extends Operator
+case object Ampersand extends Operator
+case object Not extends Operator
+

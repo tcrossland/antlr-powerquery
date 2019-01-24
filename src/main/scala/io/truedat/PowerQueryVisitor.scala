@@ -12,36 +12,24 @@ import org.antlr.v4.runtime.tree.{ ParseTree, ParseTreeProperty, TerminalNode }
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
-import scala.collection.mutable
 
-class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
+object PowerQueryVisitor extends App {
+  val logger: Logger = Logger[PowerQueryVisitor]
 
-  val logger: Logger = Logger[PowerQueryVisitorScala]
+  val fileName: String = args.head
+  val parser: PowerQueryParser = new PowerQueryParser {}
+  val ctx: SectionDocumentContext = parser.parseFile(args.head)
+  val visitor: PowerQueryVisitor = new PowerQueryVisitor()
+  val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
+  logger.info(doc.toString)
+
+}
+
+class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
+
+  val logger: Logger = Logger[PowerQueryVisitor]
 
   private val values: ParseTreeProperty[Node] = new ParseTreeProperty[Node]()
-
-  private def setValue(node: ParseTree, value: Node): Unit = values.put(node, value)
-
-  private def getValue(node: ParseTree): Node = values.get(node)
-
-  private def readGeneralizedIdentifier(node: TerminalNode): Identifier =
-    Identifier(node.getSymbol.getText.trim)
-
-  private def readOptionalIdentifier(node: TerminalNode): Option[Identifier] = {
-    node match {
-      case null => None
-      case _ => Some(readIdentifier(node))
-    }
-  }
-
-  private def readIdentifier(node: TerminalNode): Identifier = Identifier(node.getSymbol.getText)
-
-  private def readTextLiteral(node: TerminalNode): TextLiteral =
-    TextLiteral(node.getSymbol.getText)
-
-  private def readNumberLiteral(node: TerminalNode): NumberLiteral =
-    NumberLiteral(node.getSymbol.getText)
-
 
   override def visitSectionDocument(ctx: SectionDocumentContext): Section = visitSection(ctx.section())
 
@@ -53,9 +41,7 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
 
     val members: List[SectionMember] = ctx.sectionMember().asScala.map(visitSectionMember).toList
     val name: Option[Identifier] = readOptionalIdentifier(ctx.IDENTIFIER())
-    val section = Section(name, members, attributes)
-    logger.info(section.toString)
-    section
+    Section(name, members, attributes)
   }
 
   override def visitSectionMember(ctx: SectionMemberContext): SectionMember = {
@@ -94,6 +80,18 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
       readGeneralizedIdentifier(ctx.GENERALIZED_IDENTIFIER())
     )
   }
+
+  private def readGeneralizedIdentifier(node: TerminalNode): Identifier =
+    Identifier(node.getSymbol.getText.trim)
+
+  private def readOptionalIdentifier(node: TerminalNode): Option[Identifier] = {
+    node match {
+      case null => None
+      case _ => Some(readIdentifier(node))
+    }
+  }
+
+  private def readIdentifier(node: TerminalNode): Identifier = Identifier(node.getSymbol.getText)
 
   override def visitExpression(ctx: ExpressionContext): Expression =
     super.visitExpression(ctx).asInstanceOf[Expression]
@@ -138,6 +136,12 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
   override def visitAnyLiteral(ctx: AnyLiteralContext): Literal =
     super.visitAnyLiteral(ctx).asInstanceOf[Literal]
 
+  override def visitFieldName(ctx: FieldNameContext): Identifier = {
+    readOptionalIdentifier(ctx.IDENTIFIER()).getOrElse(
+      readGeneralizedIdentifier(ctx.GENERALIZED_IDENTIFIER())
+    )
+  }
+
   override def visitLiteralExpression(ctx: LiteralExpressionContext): Expression = {
     val literal: Literal = visitAnyLiteral(ctx.anyLiteral())
     LiteralExpression(literal)
@@ -146,11 +150,6 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
   override def visitListExpression(ctx: ListExpressionContext): Expression = {
     val list: ItemList = visitItemList(ctx.itemList())
     ListExpression(list)
-  }
-
-  override def visitItemList(ctx: ItemListContext): ItemList = {
-    val items: List[Item] = ctx.item().asScala.map(visit).map(x => x.asInstanceOf[Item]).toList
-    ItemList(items)
   }
 
   override def visitRecordExpression(ctx: RecordExpressionContext): Expression = {
@@ -172,12 +171,6 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     Field(fieldName, expression)
   }
 
-  override def visitFieldName(ctx: FieldNameContext): Identifier = {
-    readOptionalIdentifier(ctx.IDENTIFIER()).getOrElse(
-      readGeneralizedIdentifier(ctx.GENERALIZED_IDENTIFIER())
-    )
-  }
-
   override def visitIdentifierExpression(ctx: IdentifierExpressionContext): Expression = {
     val identifier = readIdentifier(ctx.IDENTIFIER())
     IdentifierExpression(identifier)
@@ -196,12 +189,10 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
   override def visitItemAccessExpression(ctx: ItemAccessExpressionContext): Expression = {
     val expression: Expression = visit(ctx.primaryExpression()).asInstanceOf[Expression]
     val itemSelector: Expression = visitItemSelector(ctx.itemSelector())
-    val optional = ctx.QUESTION() != null
-    ItemSelection(expression, itemSelector, optional)
-  }
-
-  override def visitItemSelector(ctx: ItemSelectorContext): Expression = {
-    visit(ctx.expression()).asInstanceOf[Expression]
+    ctx.QUESTION() match {
+      case null => ItemSelection(expression, itemSelector)
+      case _ => OptionalItemSelection(expression, itemSelector)
+    }
   }
 
   override def visitInvokeExpression(ctx: InvokeExpressionContext): Expression = {
@@ -231,61 +222,116 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitLogicalOrExpression(ctx: LogicalOrExpressionContext): Expression = {
     val expressions: List[Expression] = ctx.logicalAndExpression().asScala.map(visitLogicalAndExpression).toList
-    if (expressions.length > 2) logger.info(LogicalOrExpression(expressions).toString)
-    if (expressions.length > 1) LogicalOrExpression(expressions) else expressions.head
+    expressions.reduce((e1, e2) => LogicalOrExpression(e1, e2))
   }
 
   override def visitLogicalAndExpression(ctx: LogicalAndExpressionContext): Expression = {
     val expressions = ctx.isExpression().asScala.map(visitIsExpression).toList
-    if (expressions.length > 2) logger.info(LogicalAndExpression(expressions).toString)
-    if (expressions.length > 1) LogicalAndExpression(expressions) else expressions.head
+    expressions.reduce((e1, e2) => LogicalAndExpression(e1, e2))
   }
 
   override def visitIsExpression(ctx: IsExpressionContext): Expression = {
     val asExpression: Expression = visitAsExpression(ctx.asExpression())
-    if (ctx.IS().isEmpty) asExpression else IsExpression(asExpression)
+    val types = ctx.nullablePrimitiveType().asScala.map(visitNullablePrimitiveType).toList
+    types.foldLeft(asExpression)(
+      (e, is) => IsExpression(e, is)
+    )
   }
 
   override def visitAsExpression(ctx: AsExpressionContext): Expression = {
     val equalityExpression: Expression = visitEqualityExpression(ctx.equalityExpression())
-    if (ctx.AS().isEmpty) equalityExpression else AsExpression(equalityExpression)
+    val types = ctx.nullablePrimitiveType().asScala.map(visitNullablePrimitiveType).toList
+    types.foldLeft(equalityExpression)(
+      (e, as) => AsExpression(e, as)
+    )
+  }
+
+  override def visitNullablePrimitiveType(ctx: NullablePrimitiveTypeContext): Type = {
+    val primitiveType = visitPrimitiveType(ctx.primitiveType())
+    val nullable = ctx.NULLABLE() != null
+    if (nullable) NullableType(primitiveType) else primitiveType
   }
 
   override def visitEqualityExpression(ctx: EqualityExpressionContext): Expression = {
     val expressions = ctx.relationalExpression().asScala.map(visitRelationalExpression).toList
-    if (expressions.length > 2) logger.info(EqualityExpression(expressions).toString)
-    if (expressions.length > 1) EqualityExpression(expressions) else expressions.head
+    val operators = ctx.equalityOperator().asScala.map(visitEqualityOperator).toList
+    operators.zip(expressions.tail).foldLeft(expressions.head)(
+      (e, pair) => EqualityExpression(pair._1, e, pair._2)
+    )
+  }
+
+  override def visitEqualityOperator(ctx: EqualityOperatorContext): Operator = {
+    if (null != ctx.EQ()) Equal else NotEqual
   }
 
   override def visitRelationalExpression(ctx: RelationalExpressionContext): Expression = {
     val expressions = ctx.additiveExpression().asScala.map(visitAdditiveExpression).toList
-    if (expressions.length > 2) logger.info(RelationalExpression(expressions).toString)
-    if (expressions.length > 1) RelationalExpression(expressions) else expressions.head
+    val operators = ctx.relationalOperator().asScala.map(visitRelationalOperator).toList
+    operators.zip(expressions.tail).foldLeft(expressions.head)(
+      (e, pair) => RelationalExpression(pair._1, e, pair._2)
+    )
+  }
+
+  override def visitRelationalOperator(ctx: RelationalOperatorContext): Operator = {
+    if (null != ctx.LT()) LessThan
+    else if (null != ctx.GT()) GreaterThan
+    else if (null != ctx.LE()) LessOrEqual
+    else if (null != ctx.GE()) GreaterOrEqual
+    else ???
   }
 
   override def visitAdditiveExpression(ctx: AdditiveExpressionContext): Expression = {
-    val expressions = ctx.multiplicativeExpression().asScala.map(visitMultiplicativeExpression).toList
-    if (expressions.length > 2) logger.info(AdditiveExpression(expressions).toString)
-    if (expressions.length > 1) AdditiveExpression(expressions) else expressions.head
+    val expressions: List[Expression] = ctx.multiplicativeExpression().asScala.map(visitMultiplicativeExpression).toList
+    val operators: List[Operator] = ctx.additiveOperator().asScala.map(visitAdditiveOperator).toList
+    operators.zip(expressions.tail).foldLeft(expressions.head)(
+      (e, pair) => AdditiveExpression(pair._1, e, pair._2)
+    )
+  }
+
+  override def visitAdditiveOperator(ctx: AdditiveOperatorContext): Operator = {
+    if (null != ctx.PLUS()) Plus
+    else if (null != ctx.MINUS()) Minus
+    else if (null != ctx.AMP()) Ampersand
+    else ???
   }
 
   override def visitMultiplicativeExpression(ctx: MultiplicativeExpressionContext): Expression = {
     val expressions = ctx.metaExpression().asScala.map(visitMetaExpression).toList
-    if (expressions.length > 2) logger.info(MultiplicativeExpression(expressions).toString)
-    if (expressions.length > 1) MultiplicativeExpression(expressions) else expressions.head
+    val operators = ctx.multiplicativeOperator().asScala.map(visitMultiplicativeOperator).toList
+    operators.zip(expressions.tail).foldLeft(expressions.head)(
+      (e, pair) => MultiplicativeExpression(pair._1, e, pair._2)
+    )
+  }
+
+  override def visitMultiplicativeOperator(ctx: MultiplicativeOperatorContext): Operator = {
+    if (null != ctx.STAR()) Times
+    else if (null != ctx.DIV()) Divide
+    else ???
   }
 
   override def visitMetaExpression(ctx: MetaExpressionContext): Expression = {
     val expressions = ctx.unaryExpression().asScala.map(visitUnaryExpression).toList
-    if (expressions.length > 2) logger.info(MetaExpression(expressions).toString)
-    if (expressions.length > 1) MetaExpression(expressions) else expressions.head
+    expressions.reduce((e1, e2) => MetaExpression(e1, e2))
   }
 
   override def visitUnaryExpression(ctx: UnaryExpressionContext): Expression = {
-    ctx.typeExpression() match {
+    val expression = ctx.typeExpression() match {
       case null => visitUnaryExpression(ctx.unaryExpression())
       case _ => visitTypeExpression(ctx.typeExpression())
     }
+    ctx.unaryOperator() match {
+      case null => expression
+      case o =>
+        val operator = visitUnaryOperator(o)
+        UnaryExpression(operator, expression)
+    }
+  }
+
+  override def visitUnaryOperator(ctx: UnaryOperatorContext): Operator = {
+    if (null != ctx.PLUS()) Plus
+    else if (null != ctx.MINUS()) Minus
+    else if (null != ctx.NOT()) Not
+    else ???
   }
 
   override def visitTypeExpression(ctx: TypeExpressionContext): Expression = {
@@ -322,6 +368,14 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     }
   }
 
+  private def setValue(node: ParseTree, value: Node): Unit = values.put(node, value)
+
+  private def readTextLiteral(node: TerminalNode): TextLiteral =
+    TextLiteral(node.getSymbol.getText)
+
+  private def readNumberLiteral(node: TerminalNode): NumberLiteral =
+    NumberLiteral(node.getSymbol.getText)
+
   override def visitFieldAccessExpression_LITERAL(ctx: FieldAccessExpression_LITERALContext): Node = {
     visit(ctx.fieldAccessExpression_primaryExpression())
   }
@@ -331,9 +385,14 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     val expression: Expression = ListExpression(list)
     val selection: Node = visit(ctx.fieldAccessExpression_primaryExpression())
     selection match {
-      case FieldSelector(_, _) => FieldSelection(expression, selection)
-      case Projection(_, _) => FieldSelection(expression, selection)
+      case _: FieldSelector => FieldSelection(expression, selection)
+      case _: Projection => FieldSelection(expression, selection)
     }
+  }
+
+  override def visitItemList(ctx: ItemListContext): ItemList = {
+    val items: List[Item] = ctx.item().asScala.map(visit).map(x => x.asInstanceOf[Item]).toList
+    ItemList(items)
   }
 
   override def visitFieldSelection(ctx: FieldSelectionContext): FieldSelector = {
@@ -347,15 +406,17 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     }
   }
 
-  override def visitOptionalFieldSelector(ctx: OptionalFieldSelectorContext): FieldSelector = {
+  override def visitOptionalFieldSelector(ctx: OptionalFieldSelectorContext): OptionalFieldSelector = {
     val fieldName: Identifier = visitFieldName(ctx.fieldName())
-    FieldSelector(fieldName, optional = true)
+    OptionalFieldSelector(fieldName)
   }
 
   override def visitProjection(ctx: ProjectionContext): Projection = {
-    val optional = ctx.QUESTION() != null
     val selectorList: SelectorList = visitRequiredSelectorList(ctx.requiredSelectorList())
-    Projection(selectorList, optional)
+    ctx.QUESTION() match {
+      case null => RequiredProjection(selectorList)
+      case _ => OptionalProjection(selectorList)
+    }
   }
 
   override def visitRequiredSelectorList(ctx: RequiredSelectorListContext): SelectorList = {
@@ -363,29 +424,41 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     SelectorList(requiredFieldSelectors)
   }
 
-  override def visitRequiredFieldSelector(ctx: RequiredFieldSelectorContext): FieldSelector = {
+  override def visitRequiredFieldSelector(ctx: RequiredFieldSelectorContext): RequiredFieldSelector = {
     val fieldName: Identifier = visitFieldName(ctx.fieldName())
-    FieldSelector(fieldName)
+    RequiredFieldSelector(fieldName)
   }
 
   override def visitFieldAccessExpression_primaryExpression_invokeExpression(ctx: FieldAccessExpression_primaryExpression_invokeExpressionContext): Node = ???
 
   override def visitFieldAccessExpression_primaryExpression_itemAccessExpression(ctx: FieldAccessExpression_primaryExpression_itemAccessExpressionContext): Node = {
-    val optional = ctx.QUESTION() != null
     val itemSelector: Expression = visitItemSelector(ctx.itemSelector())
-    val itemAccessExpression: ItemSelection =
-      ItemSelection(getValue(ctx.parent).asInstanceOf[Expression], itemSelector, optional)
+    val expression: Expression = getValue(ctx.parent).asInstanceOf[Expression]
+    val itemAccessExpression: ItemSelectionBase =
+      ctx.QUESTION() match {
+        case null => ItemSelection(expression, itemSelector)
+        case _ => OptionalItemSelection(expression, itemSelector)
+      }
 
     val selection = visit(ctx.fieldAccessExpression_primaryExpression())
     FieldSelection(itemAccessExpression, selection)
   }
 
+  private def getValue(node: ParseTree): Node = values.get(node)
+
+  override def visitItemSelector(ctx: ItemSelectorContext): Expression = {
+    visit(ctx.expression()).asInstanceOf[Expression]
+  }
+
   override def visitRecordExpression_fieldAccess(ctx: RecordExpression_fieldAccessContext): Node = ???
 
   override def visitImplicitTargetFieldSelection(ctx: ImplicitTargetFieldSelectionContext): ImplicitTargetFieldSelection = {
-    val optional = ctx.QUESTION() != null
     val fieldName: Identifier = visitFieldName(ctx.fieldName())
-    ImplicitTargetFieldSelection(FieldSelector(fieldName, optional))
+    val fieldSelector: FieldSelector = ctx.QUESTION() match {
+      case null => RequiredFieldSelector(fieldName)
+      case _ => OptionalFieldSelector(fieldName)
+    }
+    ImplicitTargetFieldSelection(fieldSelector)
   }
 
   override def visitIntrinsicFunctionExpression(ctx: IntrinsicFunctionExpressionContext): Node = {
@@ -409,6 +482,25 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
     val functionBody: Expression = visit(ctx.functionBody()).asInstanceOf[Expression]
     // logger.info(FunctionExpression(parameterList, returnType, functionBody).toString)
     FunctionExpression(parameterList, returnType, functionBody)
+  }
+
+  override def visitReturnType(ctx: ReturnTypeContext): Type = {
+    visitAssertion(ctx.assertion())
+  }
+
+  override def visitAssertion(ctx: AssertionContext): Type = {
+    visitType(ctx.`type`())
+  }
+
+  override def visitType(ctx: TypeContext): Type = {
+    if (null != ctx.primaryType())
+      visitPrimaryType(ctx.primaryType())
+    else
+      ExpressionType(visitExpression(ctx.expression()))
+  }
+
+  override def visitPrimaryType(ctx: PrimaryTypeContext): Type = {
+    super.visitPrimaryType(ctx).asInstanceOf[Type]
   }
 
   override def visitParameterList(ctx: ParameterListContext): Node = {
@@ -461,25 +553,6 @@ class PowerQueryVisitorScala extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitParameterType(ctx: ParameterTypeContext): Type = {
     visitAssertion(ctx.assertion())
-  }
-
-  override def visitReturnType(ctx: ReturnTypeContext): Type = {
-    visitAssertion(ctx.assertion())
-  }
-
-  override def visitAssertion(ctx: AssertionContext): Type = {
-    visitType(ctx.`type`())
-  }
-
-  override def visitType(ctx: TypeContext): Type = {
-    if (null != ctx.primaryType())
-      visitPrimaryType(ctx.primaryType())
-    else
-      ExpressionType(visitExpression(ctx.expression()))
-  }
-
-  override def visitPrimaryType(ctx: PrimaryTypeContext): Type = {
-    super.visitPrimaryType(ctx).asInstanceOf[Type]
   }
 
   override def visitTableType(ctx: TableTypeContext): Node = ???
