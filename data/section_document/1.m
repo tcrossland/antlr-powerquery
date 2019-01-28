@@ -553,7 +553,7 @@ shared #"Fichero WebApp muestra con país" = let
   
 {  
     [FromDate = 20171211, ToDate = 20171217, ViewId = "76612905", Source = "Web España", CountryIsoCode = "AD"
-    , Users = 268, newUsers = 154, Sessions = 466, avgSessionDuration = 243.87982832618025 ]
+    , Users = 268 as nullable number, newUsers = 154, Sessions = 466, avgSessionDuration = 243.87982832618025 ]
 }  
   
 )

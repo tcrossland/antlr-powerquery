@@ -3,6 +3,7 @@ package io.truedat
 import com.typesafe.scalalogging.Logger
 import io.truedat.PowerQueryFormulaParser._
 import io.truedat.ast._
+import io.truedat.eval.Scope
 import org.antlr.v4.runtime.tree.{ ParseTree, ParseTreeProperty, TerminalNode }
 
 import scala.collection.JavaConverters._
@@ -16,8 +17,17 @@ object PowerQueryVisitor extends App {
   val ctx: SectionDocumentContext = parser.parseFile(args.head)
   val visitor: PowerQueryVisitor = new PowerQueryVisitor()
   val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
-  logger.info(doc.toString)
 
+  var r: Section = doc
+  while (!r.isReduced) {
+    val s: Scope = Scope.create(r)
+    r = r.reduce(s).asInstanceOf[Section]
+  }
+
+  r.members
+    .filter(_.expression.isInstanceOf[LineageElement])
+    .map(e => (e.name, e.expression))
+    .foreach(s => logger.info(s.toString))
 }
 
 class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaParserBaseVisitor[Node] {
@@ -471,7 +481,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
   }
 
   override def visitFunctionExpression(ctx: FunctionExpressionContext): Node = {
-    val parameterList = visit(ctx.parameterList())
+    val parameterList = visitParameterList(ctx.parameterList())
     val returnType: Option[Expression] = ctx.returnType() match {
       case null => None
       case t => Some(visitReturnType(t))
@@ -500,7 +510,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
     super.visitPrimaryType(ctx).asInstanceOf[Type]
   }
 
-  override def visitParameterList(ctx: ParameterListContext): Node = {
+  override def visitParameterList(ctx: ParameterListContext): ParameterList = {
     val optionalParameterList = ctx.optionalParameterList() match {
       case null => None
       case o => Some(visitOptionalParameterList(o))

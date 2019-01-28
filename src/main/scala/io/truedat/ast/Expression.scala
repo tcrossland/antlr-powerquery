@@ -1,16 +1,19 @@
 package io.truedat.ast
 
+import io.truedat.eval._
+import io.truedat.reduce._
+
 sealed abstract class Node
 
 sealed abstract class TypeNode extends Node
 
-case class Section(name: Option[Identifier], members: List[SectionMember], attributes: Option[RecordLiteral]) extends Node
+case class Section(name: Option[Identifier], members: List[SectionMember], attributes: Option[RecordLiteral]) extends Expression with SectionReducer
 
 sealed abstract class Expression extends Node with ExpressionReducer
 
 abstract class TestExpression extends Expression
 
-case class SectionMember(name: Identifier, expression: Expression, shared: Boolean, attributes: Option[RecordLiteral]) extends Expression
+case class SectionMember(name: Identifier, expression: Expression, shared: Boolean, attributes: Option[RecordLiteral]) extends Expression with SectionMemberReducer
 
 case class LogicalOrExpression(e1: Expression, e2: Expression) extends Expression with LogicalOrExpressionReducer
 
@@ -20,7 +23,7 @@ case class IsExpression(expression: Expression, is: Type) extends Expression
 
 case class AsExpression(expression: Expression, as: Type) extends Expression
 
-case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with EqualityExpressionReducer
 
 case class RelationalExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
 
@@ -40,11 +43,11 @@ case class SectionAccessExpression(section: Identifier, identifier: Identifier) 
 
 sealed abstract class ItemSelectionBase extends Expression
 
-case class ItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase with ItemSelectionReducer
+case class ItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase with ItemSelectionReducer with ItemSelectionEvaluator
 
 case class OptionalItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase
 
-case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression with InvokeExpressionReducer
+case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression with InvokeExpressionReducer with InvokeExpressionEvaluator
 
 case class RecordExpression(fieldList: FieldList) extends Expression
 
@@ -76,13 +79,13 @@ case class FieldType(t: Identifier) extends Node
 
 sealed abstract class FieldSelector extends Expression
 
-case class RequiredFieldSelector(name: Identifier) extends FieldSelector
+case class RequiredFieldSelector(name: Identifier) extends FieldSelector with FieldSelectorReducer
 
-case class OptionalFieldSelector(name: Identifier) extends FieldSelector
+case class OptionalFieldSelector(name: Identifier) extends FieldSelector with FieldSelectorReducer
 
-case class FieldSelection(expression: Expression, selection: FieldSelector) extends Expression with FieldSelectionReducer
+case class FieldSelection(expression: Expression, selection: FieldSelector) extends Expression with FieldSelectionReducer with FieldSelectionEvaluator
 
-case class ImplicitTargetFieldSelection(selection: FieldSelector) extends Expression
+case class ImplicitTargetFieldSelection(selection: FieldSelector) extends Expression with ImplicitTargetFieldSelectionReducer
 
 sealed abstract class Projection extends FieldSelector
 
@@ -94,17 +97,17 @@ case class SelectorList(selectors: List[FieldSelector]) extends Node
 
 case class ListExpression(list: ItemList) extends Expression
 
-case class EachExpression(functionBody: Expression) extends Expression
+case class EachExpression(functionBody: Expression) extends Expression with EachExpressionReducer
 
-case class FunctionExpression(parameterList: Node, returnType: Option[Expression], functionBody: Expression) extends Expression
+case class FunctionExpression(parameterList: ParameterList, returnType: Option[Expression], functionBody: Expression) extends Expression
 
-case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Node
+case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Expression
 
-case class FixedParameterList(parameters: List[Parameter]) extends Node
+case class FixedParameterList(parameters: List[Parameter]) extends Expression
 
-case class OptionalParameterList(parameters: List[Parameter]) extends Node
+case class OptionalParameterList(parameters: List[Parameter]) extends Expression
 
-case class Parameter(name: Identifier, parameterType: Option[Expression]) extends Node
+case class Parameter(name: Identifier, parameterType: Option[Expression]) extends Expression
 
 sealed abstract class Type extends Expression
 
@@ -194,7 +197,9 @@ case class ListLiteral(value: List[Value]) extends Value {
 
 case class NumberLiteral(value: String) extends Value
 
-case class TextLiteral(value: String) extends Value
+case class TextLiteral(value: String) extends Value {
+  override def toString: String = value
+}
 
 case class ItemList(list: List[Item]) extends Node
 
@@ -202,4 +207,10 @@ case class Sequence(from: Expression, to: Expression) extends Node
 
 case class Item(e: Expression) extends Node
 
-case class DataSource(id: String, args: List[Value]) extends Value
+sealed abstract class LineageElement extends Value
+
+case class DataSource(id: String, args: List[Value]) extends LineageElement with DataSourceEvaluator
+
+case class DataStructure(schema: String, item: String, source: DataSource) extends LineageElement
+
+case class Transformation(transform: String, e: Expression, args: Any) extends LineageElement with ValueReducer
