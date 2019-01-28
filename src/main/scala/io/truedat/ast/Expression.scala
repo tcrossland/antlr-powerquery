@@ -1,0 +1,205 @@
+package io.truedat.ast
+
+sealed abstract class Node
+
+sealed abstract class TypeNode extends Node
+
+case class Section(name: Option[Identifier], members: List[SectionMember], attributes: Option[RecordLiteral]) extends Node
+
+sealed abstract class Expression extends Node with ExpressionReducer
+
+abstract class TestExpression extends Expression
+
+case class SectionMember(name: Identifier, expression: Expression, shared: Boolean, attributes: Option[RecordLiteral]) extends Expression
+
+case class LogicalOrExpression(e1: Expression, e2: Expression) extends Expression with LogicalOrExpressionReducer
+
+case class LogicalAndExpression(e1: Expression, e2: Expression) extends Expression with LogicalAndExpressionReducer
+
+case class IsExpression(expression: Expression, is: Type) extends Expression
+
+case class AsExpression(expression: Expression, as: Type) extends Expression
+
+case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+
+case class RelationalExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+
+case class AdditiveExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+
+case class MultiplicativeExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+
+case class MetaExpression(expression: Expression, meta: Expression) extends Expression
+
+case class UnaryExpression(operator: Operator, expression: Expression) extends Expression
+
+case class Identifier(id: String) extends Expression
+
+case class IdentifierExpression(identifier: Identifier) extends Expression with IdentifierExpressionReducer
+
+case class SectionAccessExpression(section: Identifier, identifier: Identifier) extends Expression
+
+sealed abstract class ItemSelectionBase extends Expression
+
+case class ItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase with ItemSelectionReducer
+
+case class OptionalItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase
+
+case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression with InvokeExpressionReducer
+
+case class RecordExpression(fieldList: FieldList) extends Expression
+
+case class LetExpression(variableList: VariableList, expression: Expression) extends Expression with LetExpressionReducer
+
+case class ArgumentList(expressions: List[Expression]) extends Expression with ArgumentListReducer {
+  // override def toString: String = "Argument" + expressions.toString
+}
+
+case class VariableList(variables: List[Variable]) extends Expression with VariableListReducer {
+  // override def toString: String = "Variable" + variables.toString
+}
+
+case class Variable(name: Identifier, expression: Expression) extends Expression with VariableReducer
+
+case class TypeExpression(t: Type) extends Expression
+
+case class Field(fieldName: Identifier, expression: Expression) extends Expression
+
+case class FieldList(fields: List[Field]) extends Expression {
+  override def toString: String = "Field" + fields.toString
+}
+
+case class RowType(fieldSpecs: List[FieldSpecification]) extends Node
+
+case class FieldSpecification(optional: Boolean, identifier: Identifier, fieldType: FieldType) extends Node
+
+case class FieldType(t: Identifier) extends Node
+
+sealed abstract class FieldSelector extends Expression
+
+case class RequiredFieldSelector(name: Identifier) extends FieldSelector
+
+case class OptionalFieldSelector(name: Identifier) extends FieldSelector
+
+case class FieldSelection(expression: Expression, selection: FieldSelector) extends Expression with FieldSelectionReducer
+
+case class ImplicitTargetFieldSelection(selection: FieldSelector) extends Expression
+
+sealed abstract class Projection extends FieldSelector
+
+case class RequiredProjection(selectors: SelectorList) extends Projection
+
+case class OptionalProjection(selectors: SelectorList) extends Projection
+
+case class SelectorList(selectors: List[FieldSelector]) extends Node
+
+case class ListExpression(list: ItemList) extends Expression
+
+case class EachExpression(functionBody: Expression) extends Expression
+
+case class FunctionExpression(parameterList: Node, returnType: Option[Expression], functionBody: Expression) extends Expression
+
+case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Node
+
+case class FixedParameterList(parameters: List[Parameter]) extends Node
+
+case class OptionalParameterList(parameters: List[Parameter]) extends Node
+
+case class Parameter(name: Identifier, parameterType: Option[Expression]) extends Node
+
+sealed abstract class Type extends Expression
+
+case class NullableType(t: Type) extends Type
+
+case class LiteralExpression(literal: Value) extends Expression
+
+case object IntrinsicTableFunction extends Expression
+
+case object AnyType extends Type
+
+case object AnyNonNullType extends Type
+
+case object BinaryType extends Type
+
+case object DateType extends Type
+
+case object DateTimeType extends Type
+
+case object DateTimeZoneType extends Type
+
+case object DurationType extends Type
+
+case object FunctionType extends Type
+
+case object ListType extends Type
+
+case object LogicalType extends Type
+
+case object NoneType extends Type
+
+case object NullType extends Type
+
+case object NumberType extends Type
+
+case object RecordType extends Type
+
+case object TableType extends Type
+
+case object TextType extends Type
+
+case object TypeType extends Type
+
+sealed abstract class Operator extends Node
+
+case object Equal extends Operator
+
+case object NotEqual extends Operator
+
+case object LessThan extends Operator
+
+case object GreaterThan extends Operator
+
+case object LessOrEqual extends Operator
+
+case object GreaterOrEqual extends Operator
+
+case object Plus extends Operator
+
+case object Minus extends Operator
+
+case object Times extends Operator
+
+case object Divide extends Operator
+
+case object Ampersand extends Operator
+
+case object Not extends Operator
+
+sealed abstract class Value extends Expression with ValueReducer // TODO: should extend Node not Expression?
+
+case object NullLiteral extends Value
+
+sealed abstract class LogicalLiteral extends Value
+
+case object FalseLiteral extends LogicalLiteral
+
+case object TrueLiteral extends LogicalLiteral
+
+case class RecordLiteral(value: List[LiteralField]) extends Value
+
+case class LiteralField(name: Identifier, value: Value) extends Value
+
+case class ListLiteral(value: List[Value]) extends Value {
+  override def toString: String = "Literal" + value.toString
+}
+
+case class NumberLiteral(value: String) extends Value
+
+case class TextLiteral(value: String) extends Value
+
+case class ItemList(list: List[Item]) extends Node
+
+case class Sequence(from: Expression, to: Expression) extends Node
+
+case class Item(e: Expression) extends Node
+
+case class DataSource(id: String, args: List[Value]) extends Value

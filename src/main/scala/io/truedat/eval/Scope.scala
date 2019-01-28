@@ -1,17 +1,27 @@
 package io.truedat.eval
 
+import io.truedat.ast._
+
 object Scope {
-  var id: Int = 0
-  def nextId: Int = { val i = id; id += 1; i }
-  val TOP = new Scope(None, Set())
+  def create(section: Section): Scope =
+    Scope(None, section.members.map(m => (m.name, m.expression)).toMap)
+
+  def extend(parent: Scope, e: Expression): Scope = e match {
+    case v: VariableList =>
+      Scope(
+        Some(parent),
+        v.variables.map(m => (m.name, m.expression)).toMap
+      )
+    case l: LetExpression =>
+      extend(parent, l.variableList)
+    case _ => ???
+  }
 }
 
-class Scope(val parent: Option[Scope], val boundNames: Set[String]) {
-  val id: Int = Scope.nextId
-
-  def closestBinding(name: String): Option[Scope] =
-    if (boundNames contains name)
-      Some(this)
+case class Scope(parent: Option[Scope], bindings: Map[Identifier, Expression]) {
+  def closestBinding(name: Identifier): Option[Expression] =
+    if (bindings.contains(name))
+      Some(bindings(name))
     else
-      parent flatMap (_ closestBinding name)
+      parent.flatMap(_.closestBinding(name))
 }

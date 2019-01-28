@@ -2,12 +2,7 @@ package io.truedat
 
 import com.typesafe.scalalogging.Logger
 import io.truedat.PowerQueryFormulaParser._
-import io.truedat.model.Node
-import io.truedat.model.expression.{ RelationalExpression, _ }
-import io.truedat.model.field.LiteralField
-import io.truedat.model.identifier.Identifier
-import io.truedat.model.item.{ Item, ItemList, Sequence }
-import io.truedat.model.literal.{ NullLiteral, _ }
+import io.truedat.ast._
 import org.antlr.v4.runtime.tree.{ ParseTree, ParseTreeProperty, TerminalNode }
 
 import scala.collection.JavaConverters._
@@ -25,7 +20,7 @@ object PowerQueryVisitor extends App {
 
 }
 
-class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
+class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   val logger: Logger = Logger[PowerQueryVisitor]
 
@@ -45,9 +40,13 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
   }
 
   override def visitSectionMember(ctx: SectionMemberContext): SectionMember = {
-    val attributes: Option[RecordLiteral] = ctx.literalAttributes() match {
-      case null => None
-      case r => Some(visitLiteralAttributes(r))
+    val attributes: Option[RecordLiteral] = if (autoReduce) {
+      None
+    } else {
+      ctx.literalAttributes() match {
+        case null => None
+        case r => Some(visitLiteralAttributes(r))
+      }
     }
     val name: Identifier = readIdentifier(ctx.IDENTIFIER())
     val expression: Expression = visitExpression(ctx.expression())
@@ -60,11 +59,11 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitLetExpression(ctx: LetExpressionContext): LetExpression = {
     val expression: Expression = visit(ctx.expression()).asInstanceOf[Expression]
-    val variableList: Node = visit(ctx.variableList())
+    val variableList: VariableList = visitVariableList(ctx.variableList())
     LetExpression(variableList, expression)
   }
 
-  override def visitVariableList(ctx: VariableListContext): Node = {
+  override def visitVariableList(ctx: VariableListContext): VariableList = {
     val variables: List[Variable] = ctx.variable().asScala.map(visitVariable).toList
     VariableList(variables)
   }
@@ -102,7 +101,7 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
       case _ => FalseLiteral
     }
 
-  override def visitNullLiteral(ctx: NullLiteralContext): Literal =
+  override def visitNullLiteral(ctx: NullLiteralContext): Value =
     NullLiteral
 
   override def visitNumberLiteral(ctx: NumberLiteralContext): NumberLiteral =
@@ -115,7 +114,7 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
     visitLiteralItemList(ctx.literalItemList())
 
   override def visitLiteralItemList(ctx: LiteralItemListContext): ListLiteral = {
-    val list = ctx.anyLiteral().asScala.map(visit).toList
+    val list = ctx.anyLiteral().asScala.map(visitAnyLiteral).toList
     ListLiteral(list)
   }
 
@@ -123,18 +122,18 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
     visitLiteralFieldList(ctx.literalFieldList())
 
   override def visitLiteralFieldList(ctx: LiteralFieldListContext): RecordLiteral = {
-    val list = ctx.literalField().asScala.map(visit).toList
+    val list = ctx.literalField().asScala.map(visitLiteralField).toList
     RecordLiteral(list)
   }
 
   override def visitLiteralField(ctx: LiteralFieldContext): LiteralField = {
     val fieldName: Identifier = visitFieldName(ctx.fieldName())
-    val value: Literal = visitAnyLiteral(ctx.anyLiteral())
+    val value: Value = visitAnyLiteral(ctx.anyLiteral())
     LiteralField(fieldName, value)
   }
 
-  override def visitAnyLiteral(ctx: AnyLiteralContext): Literal =
-    super.visitAnyLiteral(ctx).asInstanceOf[Literal]
+  override def visitAnyLiteral(ctx: AnyLiteralContext): Value =
+    super.visitAnyLiteral(ctx).asInstanceOf[Value]
 
   override def visitFieldName(ctx: FieldNameContext): Identifier = {
     readOptionalIdentifier(ctx.IDENTIFIER()).getOrElse(
@@ -143,8 +142,8 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
   }
 
   override def visitLiteralExpression(ctx: LiteralExpressionContext): Expression = {
-    val literal: Literal = visitAnyLiteral(ctx.anyLiteral())
-    LiteralExpression(literal)
+    val literal: Value = visitAnyLiteral(ctx.anyLiteral())
+    if (autoReduce) literal else LiteralExpression(literal)
   }
 
   override def visitListExpression(ctx: ListExpressionContext): Expression = {
@@ -311,7 +310,10 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitMetaExpression(ctx: MetaExpressionContext): Expression = {
     val expressions = ctx.unaryExpression().asScala.map(visitUnaryExpression).toList
-    expressions.reduce((e1, e2) => MetaExpression(e1, e2))
+    if (autoReduce)
+      expressions.head
+    else
+      expressions.reduce((e1, e2) => MetaExpression(e1, e2))
   }
 
   override def visitUnaryExpression(ctx: UnaryExpressionContext): Expression = {
@@ -337,26 +339,24 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
   override def visitTypeExpression(ctx: TypeExpressionContext): Expression = {
     ctx.TYPE() match {
       case null => visit(ctx.primaryExpression()).asInstanceOf[Expression]
-      case _ => TypeExpression
+      case _ =>
+        val t: Type = visitPrimaryType(ctx.primaryType())
+        TypeExpression(t)
     }
   }
 
   override def visitFieldSelectionOrProjection(ctx: FieldSelectionOrProjectionContext): Node = {
-    if (null != ctx.TEXT_LITERAL()) {
-      val literal = readTextLiteral(ctx.TEXT_LITERAL())
-      val selection = visit(ctx.fieldAccessExpression_LITERAL())
-      FieldSelection(LiteralExpression(literal), selection)
-    } else if (null != ctx.NUMBER_LITERAL()) {
-      val literal = readNumberLiteral(ctx.NUMBER_LITERAL())
-      val selection = visit(ctx.fieldAccessExpression_LITERAL())
-      FieldSelection(LiteralExpression(literal), selection)
+    if (null != ctx.TEXT_LITERAL() || null != ctx.NUMBER_LITERAL()) {
+      val literal = if (null == ctx.NUMBER_LITERAL()) readTextLiteral(ctx.TEXT_LITERAL()) else readNumberLiteral(ctx.NUMBER_LITERAL())
+      val fieldSelector = visit(ctx.fieldAccessExpression_LITERAL()).asInstanceOf[FieldSelector]
+      val literalExpression = if (autoReduce) literal else LiteralExpression(literal)
+      FieldSelection(literalExpression, fieldSelector)
     } else if (null != ctx.OPEN_BRACE()) {
       visit(ctx.fieldAccessExpression_OPEN_BRACE())
     } else if (null != ctx.IDENTIFIER()) {
       val identifier = readIdentifier(ctx.IDENTIFIER())
       this.setValue(ctx.fieldAccessExpression_IDENTIFIER, IdentifierExpression(identifier))
-      val selection = visit(ctx.fieldAccessExpression_IDENTIFIER())
-      FieldSelection(IdentifierExpression(identifier), selection)
+      visit(ctx.fieldAccessExpression_IDENTIFIER())
     } else if (null != ctx.AT()) {
       ???
     } else if (null != ctx.OPEN_PARENS()) {
@@ -383,11 +383,8 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
   override def visitFieldAccessExpression_OPEN_BRACE(ctx: FieldAccessExpression_OPEN_BRACEContext): FieldSelection = {
     val list: ItemList = visitItemList(ctx.itemList())
     val expression: Expression = ListExpression(list)
-    val selection: Node = visit(ctx.fieldAccessExpression_primaryExpression())
-    selection match {
-      case _: FieldSelector => FieldSelection(expression, selection)
-      case _: Projection => FieldSelection(expression, selection)
-    }
+    val selection: FieldSelector = visit(ctx.fieldAccessExpression_primaryExpression()).asInstanceOf[FieldSelector]
+    FieldSelection(expression, selection)
   }
 
   override def visitItemList(ctx: ItemListContext): ItemList = {
@@ -440,8 +437,8 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
         case _ => OptionalItemSelection(expression, itemSelector)
       }
 
-    val selection = visit(ctx.fieldAccessExpression_primaryExpression())
-    FieldSelection(itemAccessExpression, selection)
+    val fieldSelector = visit(ctx.fieldAccessExpression_primaryExpression()).asInstanceOf[FieldSelector]
+    FieldSelection(itemAccessExpression, fieldSelector)
   }
 
   private def getValue(node: ParseTree): Node = values.get(node)
@@ -475,7 +472,7 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitFunctionExpression(ctx: FunctionExpressionContext): Node = {
     val parameterList = visit(ctx.parameterList())
-    val returnType: Option[Type] = ctx.returnType() match {
+    val returnType: Option[Expression] = ctx.returnType() match {
       case null => None
       case t => Some(visitReturnType(t))
     }
@@ -484,19 +481,19 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
     FunctionExpression(parameterList, returnType, functionBody)
   }
 
-  override def visitReturnType(ctx: ReturnTypeContext): Type = {
+  override def visitReturnType(ctx: ReturnTypeContext): Expression = {
     visitAssertion(ctx.assertion())
   }
 
-  override def visitAssertion(ctx: AssertionContext): Type = {
+  override def visitAssertion(ctx: AssertionContext): Expression = {
     visitType(ctx.`type`())
   }
 
-  override def visitType(ctx: TypeContext): Type = {
+  override def visitType(ctx: TypeContext): Expression = {
     if (null != ctx.primaryType())
       visitPrimaryType(ctx.primaryType())
     else
-      ExpressionType(visitExpression(ctx.expression()))
+      visitExpression(ctx.expression())
   }
 
   override def visitPrimaryType(ctx: PrimaryTypeContext): Type = {
@@ -535,7 +532,7 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
 
   override def visitParameter(ctx: ParameterContext): Parameter = {
     val parameterName: Identifier = visitParameterName(ctx.parameterName())
-    val parameterType: Option[Type] = ctx.parameterType() match {
+    val parameterType: Option[Expression] = ctx.parameterType() match {
       case null => None
       case t =>
         Some(visitParameterType(t))
@@ -551,7 +548,7 @@ class PowerQueryVisitor extends PowerQueryFormulaParserBaseVisitor[Node] {
     readIdentifier(ctx.IDENTIFIER())
   }
 
-  override def visitParameterType(ctx: ParameterTypeContext): Type = {
+  override def visitParameterType(ctx: ParameterTypeContext): Expression = {
     visitAssertion(ctx.assertion())
   }
 
