@@ -8,7 +8,7 @@ object DataAccessFunctions {
     case (sourceType, args) =>
       DataSource(
         sourceType,
-        args.map(_.asInstanceOf[Value])
+        args
       )
     case _ =>
       throw new IllegalArgumentException("Expected 1-4 arguments")

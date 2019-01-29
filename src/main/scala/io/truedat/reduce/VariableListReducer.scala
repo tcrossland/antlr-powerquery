@@ -12,13 +12,16 @@ trait VariableListReducer extends Reducible {
     this.variables.exists(_.isReducible(scope))
 
   override def reduce: Scope => Expression = scope => {
-    val i = this.variables.indexWhere(_.isReducible(scope))
-    val reducedVariables = this.variables.splitAt(i) match {
-      case (init, v :: tail) =>
-        init ::: v.reduce(scope).asInstanceOf[Variable] :: tail
+    this.variables.indexWhere(_.isReducible(scope)) match {
+      case i if i > -1 =>
+        val reducedVariables = this.variables.splitAt(i) match {
+          case (init, v :: tail) =>
+            init ::: v.reduce(scope).asInstanceOf[Variable] :: tail
+          case _ => ???
+        }
+        this.copy(variables = reducedVariables)
       case _ => ???
     }
-    this.copy(variables = reducedVariables)
   }
 
 }

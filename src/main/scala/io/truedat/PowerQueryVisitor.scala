@@ -22,6 +22,7 @@ object PowerQueryVisitor extends App {
   while (!r.isReduced) {
     val s: Scope = Scope.create(r)
     r = r.reduce(s).asInstanceOf[Section]
+    // logger.info(r.toString)
   }
 
   r.members
@@ -100,7 +101,15 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
     }
   }
 
-  private def readIdentifier(node: TerminalNode): Identifier = Identifier(node.getSymbol.getText)
+  private def readIdentifier(node: TerminalNode): Identifier =
+    Identifier(unquote(node.getSymbol.getText))
+
+  private def unquote: String => String = s =>
+    s.charAt(0) match {
+      case '#' => s.replaceFirst("^#\"", "").replaceFirst("\"$", "")
+      case '"' => s.replaceFirst("^\"", "").replaceFirst("\"$", "")
+      case _ => s
+    }
 
   override def visitExpression(ctx: ExpressionContext): Expression =
     super.visitExpression(ctx).asInstanceOf[Expression]
@@ -158,7 +167,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
 
   override def visitListExpression(ctx: ListExpressionContext): Expression = {
     val list: ItemList = visitItemList(ctx.itemList())
-    ListExpression(list)
+    if (this.autoReduce) list else ListExpression(list)
   }
 
   override def visitRecordExpression(ctx: RecordExpressionContext): Expression = {
@@ -224,9 +233,8 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
     Sequence(from, to)
   }
 
-  override def visitSingleItem(ctx: SingleItemContext): Item = {
-    val expr: Expression = visitExpression(ctx.expression())
-    Item(expr)
+  override def visitSingleItem(ctx: SingleItemContext): Expression = {
+    visitExpression(ctx.expression())
   }
 
   override def visitLogicalOrExpression(ctx: LogicalOrExpressionContext): Expression = {
@@ -381,7 +389,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
   private def setValue(node: ParseTree, value: Node): Unit = values.put(node, value)
 
   private def readTextLiteral(node: TerminalNode): TextLiteral =
-    TextLiteral(node.getSymbol.getText)
+    TextLiteral(unquote(node.getSymbol.getText))
 
   private def readNumberLiteral(node: TerminalNode): NumberLiteral =
     NumberLiteral(node.getSymbol.getText)
@@ -392,13 +400,13 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
 
   override def visitFieldAccessExpression_OPEN_BRACE(ctx: FieldAccessExpression_OPEN_BRACEContext): FieldSelection = {
     val list: ItemList = visitItemList(ctx.itemList())
-    val expression: Expression = ListExpression(list)
+    val expression: Expression = if (this.autoReduce) list else ListExpression(list)
     val selection: FieldSelector = visit(ctx.fieldAccessExpression_primaryExpression()).asInstanceOf[FieldSelector]
     FieldSelection(expression, selection)
   }
 
   override def visitItemList(ctx: ItemListContext): ItemList = {
-    val items: List[Item] = ctx.item().asScala.map(visit).map(x => x.asInstanceOf[Item]).toList
+    val items: List[Expression] = ctx.item().asScala.map(visit).map(x => x.asInstanceOf[Expression]).toList
     ItemList(items)
   }
 
@@ -562,7 +570,38 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
     visitAssertion(ctx.assertion())
   }
 
-  override def visitTableType(ctx: TableTypeContext): Node = ???
+  override def visitTableType(ctx: TableTypeContext): TableType = {
+    val rowType = visitRowType(ctx.rowType())
+    TableType(rowType)
+  }
+
+  override def visitRowType(ctx: RowTypeContext): FieldSpecificationList = {
+    this.visitFieldSpecificationList(ctx.fieldSpecificationList())
+  }
+
+  override def visitFieldSpecificationList(ctx: FieldSpecificationListContext): FieldSpecificationList = {
+    val fieldSpecs = ctx.fieldSpecification().asScala.map(visitFieldSpecification).toList
+    FieldSpecificationList(fieldSpecs)
+  }
+
+  override def visitFieldSpecification(ctx: FieldSpecificationContext): FieldSpecification = {
+    val identifier = readOptionalIdentifier(ctx.IDENTIFIER()).getOrElse(
+      readGeneralizedIdentifier(ctx.GENERALIZED_IDENTIFIER())
+    )
+    val optional = ctx.OPTIONAL() != null
+    val fieldType = this.visitFieldTypeSpecification(ctx.fieldTypeSpecification())
+    FieldSpecification(optional, identifier, fieldType)
+  }
+
+  override def visitFieldTypeSpecification(ctx: FieldTypeSpecificationContext): Expression =
+    visitFieldType(ctx.fieldType())
+
+  override def visitFieldType(ctx: FieldTypeContext): Expression = {
+    if (null != ctx.IDENTIFIER())
+      readIdentifier(ctx.IDENTIFIER())
+    else
+      visitType(ctx.`type`())
+  }
 
   override def visitRecordType(ctx: RecordTypeContext): Node = ???
 
@@ -588,7 +627,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
       (() => null != ctx.NULL()) -> NullType,
       (() => null != ctx.NUMBER()) -> NumberType,
       (() => null != ctx.RECORD()) -> RecordType,
-      (() => null != ctx.TABLE()) -> TableType,
+      (() => null != ctx.TABLE()) -> TablePrimitiveType,
       (() => null != ctx.TEXT()) -> TextType,
       (() => null != ctx.TYPE()) -> TypeType
     )

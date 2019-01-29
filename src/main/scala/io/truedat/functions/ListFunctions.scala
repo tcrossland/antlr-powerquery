@@ -1,6 +1,6 @@
 package io.truedat.functions
 
-import io.truedat.ast.{ Expression, ListLiteral, Transformation }
+import io.truedat.ast.{ Expression, Transformation }
 
 object ListFunctions {
 

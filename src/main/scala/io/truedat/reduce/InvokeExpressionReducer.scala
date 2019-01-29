@@ -12,12 +12,12 @@ trait InvokeExpressionReducer extends Reducible {
       this.isEvaluable(scope)
 
   override def reduce: Scope => Expression = scope =>
-    if (this.expression.isReducible(scope)) {
+    if (this.expression.isReducible(scope))
       this.copy(expression = this.expression.reduce(scope))
-    } else if (this.argumentList.isReducible(scope)) {
+    else if (this.argumentList.isReducible(scope))
       this.copy(argumentList = this.argumentList.reduce(scope).asInstanceOf[ArgumentList])
-    } else if (this.isEvaluable(scope)) {
+    else if (this.isEvaluable(scope))
       this.evaluate(scope)
-    } else
+    else
       ???
 }

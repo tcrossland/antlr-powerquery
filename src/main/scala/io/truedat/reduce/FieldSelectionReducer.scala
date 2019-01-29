@@ -6,6 +6,10 @@ import io.truedat.eval.Scope
 trait FieldSelectionReducer extends Reducible {
   this: FieldSelection =>
 
+  override def isReduced: Boolean =
+    this.expression.isReduced &&
+      this.selection.isReduced
+
   override def isReducible: Scope => Boolean = scope =>
     this.expression.isReducible(scope) ||
       this.selection.isReducible(scope) ||

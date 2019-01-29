@@ -14,6 +14,16 @@ object Scope {
       )
     case l: LetExpression =>
       extend(parent, l.variableList)
+    case f: FunctionExpression =>
+      extend(parent, f.parameterList)
+    case p: ParameterList => {
+      val params = p.fixedParameters.map(_.parameters).getOrElse(List.empty[Parameter]) ++
+        p.optionalParameters.map(_.parameters).getOrElse(List.empty[Parameter])
+      Scope(
+        Some(parent),
+        params.map(p => (p.identifier, p)).toMap
+      )
+    }
     case _ => ???
   }
 }

@@ -1,6 +1,6 @@
 package io.truedat.functions
 
-import io.truedat.ast.{ Expression, ListLiteral, TextLiteral, Transformation }
+import io.truedat.ast._
 
 object TableFunctions {
 
@@ -20,10 +20,26 @@ object TableFunctions {
         ???
     }
 
+  def columnNames: List[Expression] => Expression = {
+    case table :: Nil =>
+      Transformation("Table.ColumnNames", table, None)
+    case _ =>
+      throw new IllegalArgumentException("Expected 1 argument")
+  }
+
+  def fromRecords: List[Expression] => Expression = {
+    case records :: columns :: _ =>
+      Transformation("Table.FromRecords", records, columns)
+    case records :: Nil =>
+      Transformation("Table.FromRecords", records, None)
+    case _ =>
+      throw new IllegalArgumentException("Expected 1-3 arguments")
+  }
+
   def renameColumns: List[Expression] => Expression = {
     case table :: (renames : ListLiteral) :: _ =>
       val args = listLiteralToMap(renames)
-      Transformation("RenameColumns", table, args)
+      Transformation("Table.RenameColumns", table, args)
     case _ =>
       throw new IllegalArgumentException("Expected 2 or 3 arguments")
   }
@@ -31,23 +47,58 @@ object TableFunctions {
   def selectColumns: List[Expression] => Expression = {
     case table :: (columns : ListLiteral) :: _ =>
       val args = columns.value
-      Transformation("RenameColumns", table, args)
+      Transformation("Table.SelectColumns", table, args)
     case _ =>
       throw new IllegalArgumentException("Expected 2 or 3 arguments")
   }
 
   def selectRows: List[Expression] => Expression = {
     case table :: condition :: Nil =>
-      Transformation("SelectRows", table, condition)
+      Transformation("Table.SelectRows", table, condition)
     case _ =>
       throw new IllegalArgumentException("Expected 2 arguments")
   }
 
   def removeColumns: List[Expression] => Expression = {
     case table :: columns :: _ =>
-      Transformation("RemoveColumns", table, columns)
+      Transformation("Table.RemoveColumns", table, columns)
     case _ =>
       throw new IllegalArgumentException("Expected 2 or 3 arguments")
+  }
+
+  def tableBuiltin: List[Expression] => Expression = {
+    case columns :: (rows: ItemList) :: Nil =>
+      Transformation("#table", rows, columns)
+    case _ =>
+      throw new IllegalArgumentException("Expected 2 arguments")
+  }
+
+  def transformColumnTypes: List[Expression] => Expression = {
+    case table :: typeTransformations :: _ =>
+      Transformation("Table.TransformColumnTypes", table, typeTransformations)
+    case _ =>
+      throw new IllegalArgumentException("Expected 2 or 3 arguments")
+  }
+
+  def expandTableColumn: List[Expression] => Expression = {
+    case table :: column :: columnNames :: _ =>
+      Transformation("Table.ExpandTableColumn", table, List(column, columnNames))
+    case _ =>
+      throw new IllegalArgumentException("Expected 3-4 arguments")
+  }
+
+  def addColumn: List[Expression] => Expression = {
+    case table :: newColumnName :: columnGenerator :: _ =>
+      Transformation("Table.AddColumn", table, List(newColumnName, columnGenerator))
+    case _ =>
+      throw new IllegalArgumentException("Expected 3-4 arguments")
+  }
+
+  def combine: List[Expression] => Expression = {
+    case table :: rest =>
+      Transformation("Table.Combine", table, rest)
+    case _ =>
+      throw new IllegalArgumentException("Expected XX arguments")
   }
 
 }

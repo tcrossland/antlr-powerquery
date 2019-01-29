@@ -25,11 +25,11 @@ case class AsExpression(expression: Expression, as: Type) extends Expression
 
 case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with EqualityExpressionReducer
 
-case class RelationalExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+case class RelationalExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with RelationalExpressionReducer
 
-case class AdditiveExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+case class AdditiveExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with AdditiveExpressionReducer with AdditiveExpressionEvaluator
 
-case class MultiplicativeExpression(op: Operator, e1: Expression, e2: Expression) extends Expression
+case class MultiplicativeExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with MultiplicativeExpressionReducer
 
 case class MetaExpression(expression: Expression, meta: Expression) extends Expression
 
@@ -63,7 +63,7 @@ case class VariableList(variables: List[Variable]) extends Expression with Varia
 
 case class Variable(name: Identifier, expression: Expression) extends Expression with VariableReducer
 
-case class TypeExpression(t: Type) extends Expression
+case class TypeExpression(t: Type) extends Expression with TypeExpressionReducer
 
 case class Field(fieldName: Identifier, expression: Expression) extends Expression
 
@@ -71,9 +71,12 @@ case class FieldList(fields: List[Field]) extends Expression {
   override def toString: String = "Field" + fields.toString
 }
 
-case class RowType(fieldSpecs: List[FieldSpecification]) extends Node
+case class TableType(rowType: FieldSpecificationList) extends Type
+// case class RowType(fieldSpecs: FieldSpecificationList) extends Node
 
-case class FieldSpecification(optional: Boolean, identifier: Identifier, fieldType: FieldType) extends Node
+case class FieldSpecificationList(fieldSpecs: List[FieldSpecification]) extends Expression
+
+case class FieldSpecification(optional: Boolean, identifier: Identifier, fieldType: Expression) extends Node
 
 case class FieldType(t: Identifier) extends Node
 
@@ -95,11 +98,11 @@ case class OptionalProjection(selectors: SelectorList) extends Projection
 
 case class SelectorList(selectors: List[FieldSelector]) extends Node
 
-case class ListExpression(list: ItemList) extends Expression
+case class ListExpression(list: ItemList) extends Expression with ListExpressionReducer
 
 case class EachExpression(functionBody: Expression) extends Expression with EachExpressionReducer
 
-case class FunctionExpression(parameterList: ParameterList, returnType: Option[Expression], functionBody: Expression) extends Expression
+case class FunctionExpression(parameterList: ParameterList, returnType: Option[Expression], functionBody: Expression) extends Expression with FunctionExpressionReducer
 
 case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Expression
 
@@ -107,15 +110,18 @@ case class FixedParameterList(parameters: List[Parameter]) extends Expression
 
 case class OptionalParameterList(parameters: List[Parameter]) extends Expression
 
-case class Parameter(name: Identifier, parameterType: Option[Expression]) extends Expression
+case class Parameter(identifier: Identifier, parameterType: Option[Expression]) extends Expression with ParameterReducer
 
-sealed abstract class Type extends Expression
+sealed abstract class Type extends Expression with TypeReducer
 
 case class NullableType(t: Type) extends Type
 
 case class LiteralExpression(literal: Value) extends Expression
 
-case object IntrinsicTableFunction extends Expression
+sealed abstract class IntrinsicFunction extends Expression with IntrinsicFunctionReducer
+
+case object IntrinsicTableFunction extends IntrinsicFunction
+case object DateTimeLocalNow extends IntrinsicFunction
 
 case object AnyType extends Type
 
@@ -145,7 +151,7 @@ case object NumberType extends Type
 
 case object RecordType extends Type
 
-case object TableType extends Type
+case object TablePrimitiveType extends Type
 
 case object TextType extends Type
 
@@ -201,16 +207,16 @@ case class TextLiteral(value: String) extends Value {
   override def toString: String = value
 }
 
-case class ItemList(list: List[Item]) extends Node
+case class ItemList(list: List[Expression]) extends Expression with ItemListReducer
 
 case class Sequence(from: Expression, to: Expression) extends Node
 
-case class Item(e: Expression) extends Node
-
 sealed abstract class LineageElement extends Value
 
-case class DataSource(id: String, args: List[Value]) extends LineageElement with DataSourceEvaluator
+case class DataSource(id: String, args: Any) extends LineageElement with DataSourceEvaluator
 
 case class DataStructure(schema: String, item: String, source: DataSource) extends LineageElement
 
 case class Transformation(transform: String, e: Expression, args: Any) extends LineageElement with ValueReducer
+
+case class Function(id: String, args: Any = None) extends LineageElement

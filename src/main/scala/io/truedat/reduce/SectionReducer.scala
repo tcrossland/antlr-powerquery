@@ -15,8 +15,11 @@ trait SectionReducer extends Reducible {
   override def reduce: Scope => Expression = scope => {
     this.members.indexWhere(_.isReducible(scope)) match {
       case -1 =>
-        val unreduced = this.members.filterNot(_.isReduced)
-        logger.warn(unreduced.toString)
+        this.members
+          .filterNot(_.isReduced)
+          .take(1)
+          .map(m => m.copy(expression = m.expression))
+          .foreach(e => logger.warn(e.toString))
         throw new IllegalArgumentException("No reducible members")
       case i =>
         val reducedMembers = this.members.splitAt(i) match {
