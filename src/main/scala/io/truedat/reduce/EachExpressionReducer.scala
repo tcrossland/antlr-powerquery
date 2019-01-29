@@ -8,10 +8,10 @@ trait EachExpressionReducer extends Reducible {
 
   override def isReducible: Scope => Boolean = _ => true
 
-  override def reduce: Scope => Expression = _ => {
-    // val implicitTargets = FixedParameterList(List(Parameter(Identifier("_"), None)))
-    // val parameterList = ParameterList(Some(implicitTargets), None)
-    // FunctionExpression(parameterList, None, this.functionBody)
-    this.functionBody
+  override def reduce: Scope => Expression = scope => {
+    val implicitTargets = FixedParameterList(List(Parameter(Identifier("_"), None)))
+    val parameterList = ParameterList(Some(implicitTargets), None)
+    FunctionExpression(parameterList, None, this.functionBody)
+    // this.functionBody
   }
 }

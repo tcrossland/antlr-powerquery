@@ -13,4 +13,7 @@ trait ListExpressionReducer extends Reducible {
 
   override def reduce: Scope => Expression = scope =>
     this.copy(list = this.list.reduce(scope).asInstanceOf[ItemList])
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    this.list.nextReducible(scope)
 }

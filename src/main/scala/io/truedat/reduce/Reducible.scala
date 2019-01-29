@@ -14,4 +14,6 @@ trait Reducible {
   }
 
   def isReduced: Boolean = false
+
+  def nextReducible: Scope => Option[Expression]
 }

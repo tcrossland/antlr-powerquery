@@ -1,8 +1,7 @@
-package io.truedat
+package io.truedat.reduce
 
 import io.truedat.ast._
 import io.truedat.eval.Scope
-import org.scalatest.FlatSpec
 
 class ArgumentListReducerSpec extends FlatSpec {
   val argumentList = ArgumentList(

@@ -19,7 +19,7 @@ case class LogicalOrExpression(e1: Expression, e2: Expression) extends Expressio
 
 case class LogicalAndExpression(e1: Expression, e2: Expression) extends Expression with LogicalAndExpressionReducer
 
-case class IsExpression(expression: Expression, is: Type) extends Expression
+case class IsExpression(expression: Expression, is: Type) extends Expression with IsExpressionReducer
 
 case class AsExpression(expression: Expression, as: Type) extends Expression with AsExpressionReducer
 
@@ -33,7 +33,7 @@ case class MultiplicativeExpression(op: Operator, e1: Expression, e2: Expression
 
 case class MetaExpression(expression: Expression, meta: Expression) extends Expression
 
-case class UnaryExpression(operator: Operator, expression: Expression) extends Expression
+case class UnaryExpression(operator: Operator, expression: Expression) extends Expression with UnaryExpressionReducer
 
 case class Identifier(id: String) extends Expression
 
@@ -45,7 +45,7 @@ sealed abstract class ItemSelectionBase extends Expression
 
 case class ItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase with ItemSelectionReducer with ItemSelectionEvaluator
 
-case class OptionalItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase
+case class OptionalItemSelection(expression: Expression, itemSelector: Expression) extends ItemSelectionBase with OptionalItemSelectionReducer with OptionalItemSelectionEvaluator
 
 case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression with InvokeExpressionReducer with InvokeExpressionEvaluator
 
@@ -78,8 +78,6 @@ case class FieldSpecificationList(fieldSpecs: List[FieldSpecification]) extends 
 
 case class FieldSpecification(optional: Boolean, identifier: Identifier, fieldType: Expression) extends Node
 
-case class FieldType(t: Identifier) extends Node
-
 sealed abstract class FieldSelector extends Expression
 
 case class RequiredFieldSelector(name: Identifier) extends FieldSelector with FieldSelectorReducer
@@ -102,13 +100,13 @@ case class ListExpression(list: ItemList) extends Expression with ListExpression
 
 case class EachExpression(functionBody: Expression) extends Expression with EachExpressionReducer
 
-case class FunctionExpression(parameterList: ParameterList, returnType: Option[Expression], functionBody: Expression) extends Expression with FunctionExpressionReducer
+case class FunctionExpression(parameterList: ParameterList, returnType: Option[Expression], functionBody: Expression) extends Expression with FunctionExpressionReducer with FunctionExpressionEvaluator
 
-case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Expression
+case class ParameterList(fixedParameters: Option[FixedParameterList], optionalParameters: Option[OptionalParameterList]) extends Expression with ParameterListReducer
 
-case class FixedParameterList(parameters: List[Parameter]) extends Expression
+case class FixedParameterList(parameters: List[Parameter]) extends Expression with FixedParameterListReducer
 
-case class OptionalParameterList(parameters: List[Parameter]) extends Expression
+case class OptionalParameterList(parameters: List[Parameter]) extends Expression with OptionalParameterListReducer
 
 case class Parameter(identifier: Identifier, parameterType: Option[Expression]) extends Expression with ParameterReducer
 
@@ -117,11 +115,6 @@ sealed abstract class Type extends Expression with TypeReducer
 case class NullableType(t: Type) extends Type
 
 case class LiteralExpression(literal: Value) extends Expression
-
-sealed abstract class IntrinsicFunction extends Expression with IntrinsicFunctionReducer
-
-case object IntrinsicTableFunction extends IntrinsicFunction
-case object DateTimeLocalNow extends IntrinsicFunction
 
 case object AnyType extends Type
 
@@ -185,40 +178,64 @@ case object Not extends Operator
 
 sealed abstract class Value extends Expression with ValueReducer // TODO: should extend Node not Expression?
 
-case object NullLiteral extends Value
+case object NullLiteral extends Value {
+  override def toString: String = "null"
+}
 
 sealed abstract class LogicalLiteral extends Value
 
-case object FalseLiteral extends LogicalLiteral
+case object FalseLiteral extends LogicalLiteral {
+  override def toString: String = "false"
+}
 
-case object TrueLiteral extends LogicalLiteral
+case object TrueLiteral extends LogicalLiteral {
+  override def toString: String = "true"
+}
 
 case class RecordLiteral(value: List[LiteralField] = List.empty) extends Value {
-  override def toString: String = "RecordLiteral()"
+  override def toString: String = value.mkString("[", ", ", "]")
 }
 
-case class LiteralField(name: Identifier, value: Value) extends Value
+case class LiteralField(name: Identifier, value: Value) extends Value {
+  override def toString: String = name.id + " = " + value.toString
+}
 
 case class ListLiteral(value: List[Value] = List.empty) extends Value {
-  override def toString: String = "ListLiteral()"
+  override def toString: String = value.mkString("{", ", ", "}")
 }
 
-case class NumberLiteral(value: String) extends Value
-
-case class TextLiteral(value: String) extends Value {
+case class NumberLiteral(value: String) extends Value {
   override def toString: String = value
 }
 
-case class ItemList(list: List[Expression]) extends Expression with ItemListReducer
+case class TextLiteral(value: String) extends Value {
+  override def toString: String = "\"" + value + "\""
+}
 
-case class Sequence(from: Expression, to: Expression) extends Node
+case class Builtin(value: String) extends Value {
+  override def toString: String = value
+}
+
+case class ItemList(list: List[Expression]) extends Expression with ItemListReducer {
+  override def toString: String = list.mkString("{", ", ", "}")
+}
+
+case class Sequence(from: Expression, to: Expression) extends Node {
+  override def toString: String = from.toString + " .. " + to.toString
+}
 
 sealed abstract class LineageElement extends Value
 
-case class DataSource(id: String, args: Any) extends LineageElement with DataSourceEvaluator
+case class DataSource(id: String, args: List[Expression]) extends LineageElement with DataSourceEvaluator {
+  override def toString: String = args.mkString(id + "(", ", ", ")")
+}
 
-case class DataStructure(schema: String, item: String, source: DataSource) extends LineageElement
+case class DataStructure(schema: String, item: String, source: DataSource) extends LineageElement {
+  override def toString: String = source.id + "(" + source.args.mkString(", ") + ", \"" + schema + "\", \"" + item + "\")"
+}
 
-case class Transformation(transform: String, e: Expression, args: Any) extends LineageElement with ValueReducer
+case class Transformation(fn: String, e: Expression, args: List[Expression]) extends LineageElement with ValueReducer {
+  override def toString: String = e.toString + " |> " + fn // + args.mkString("(", ", ", ")")
+}
 
 case class Function(id: String, args: Any = None) extends LineageElement

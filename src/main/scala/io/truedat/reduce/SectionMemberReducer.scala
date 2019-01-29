@@ -15,4 +15,9 @@ trait SectionMemberReducer extends Reducible {
   override def reduce: Scope => Expression = scope => {
     this.copy(expression = this.expression.reduce(scope))
   }
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    if (this.expression.isReducible(scope))
+      this.expression.nextReducible(scope)
+    else None
 }

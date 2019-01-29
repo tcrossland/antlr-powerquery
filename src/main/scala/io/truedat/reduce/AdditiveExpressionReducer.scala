@@ -22,4 +22,9 @@ trait AdditiveExpressionReducer extends Reducible {
     else
       ???
 
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    if (e1.isReducible(scope)) e1.nextReducible(scope)
+    else if (e2.isReducible(scope)) e2.nextReducible(scope)
+    else if (isEvaluable(scope)) Some(this)
+    else None
 }

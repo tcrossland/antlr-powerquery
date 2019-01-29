@@ -2,12 +2,10 @@ package io.truedat.functions
 
 import io.truedat.ast._
 
-object DateTimeFunctions {
+object DateTimeFunctions extends Functions {
 
-  def localNow: List[Expression] => Expression = {
-    case Nil =>
-      DateTimeLocalNow
-    case _ =>
-      throw new IllegalArgumentException("Expected 0 arguments")
-  }
+  val functions: Map[String, List[Expression] => Expression] = List(
+    "Date.Year",
+    "DateTime.LocalNow"
+  ).map(s => (s, transformation(s))).toMap
 }

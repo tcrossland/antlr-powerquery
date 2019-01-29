@@ -24,4 +24,6 @@ trait VariableListReducer extends Reducible {
     }
   }
 
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    this.variables.find(_.isReducible(scope)).flatMap(_.nextReducible(scope))
 }

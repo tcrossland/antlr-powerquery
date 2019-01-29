@@ -9,6 +9,7 @@ trait AdditiveExpressionEvaluator extends Evaluable {
     (op, e1, e2) match {
       case (Ampersand, TextLiteral(_), TextLiteral(_)) => true
       case (Ampersand, RequiredFieldSelector(Identifier(_)), TextLiteral(_)) => true
+      case (Ampersand, TextLiteral(_), RequiredFieldSelector(Identifier(_))) => true
       case _ => false
     }
 
@@ -16,6 +17,7 @@ trait AdditiveExpressionEvaluator extends Evaluable {
     (op, e1, e2) match {
       case (Ampersand, TextLiteral(v1), TextLiteral(v2)) => TextLiteral(v1 + v2)
       case (Ampersand, RequiredFieldSelector(Identifier(v1)), TextLiteral(v2)) => TextLiteral("[" + v1 + "]" + v2)
+      case (Ampersand, TextLiteral(v1), RequiredFieldSelector(Identifier(v2))) => TextLiteral(v1 + "[" + v2 + "]")
       case _ => ???
     }
 }

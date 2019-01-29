@@ -25,4 +25,8 @@ trait ItemListReducer extends Reducible {
         logger.warn("No item is reducible in " + this.toString)
         throw new IllegalArgumentException("No reducible items")
     }
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    this.list.find(_.isReducible(scope)).flatMap(_.nextReducible(scope))
+
 }

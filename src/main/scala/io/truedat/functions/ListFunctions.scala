@@ -1,13 +1,10 @@
 package io.truedat.functions
 
-import io.truedat.ast.{ Expression, Transformation }
+import io.truedat.ast._
 
-object ListFunctions {
+object ListFunctions extends Functions {
 
-  def max: List[Expression] => Expression = {
-    case list :: _ =>
-      Transformation("List.Max", list, None)
-    case _ =>
-      throw new IllegalArgumentException("Expected 1-4 arguments")
-  }
+  val functions: Map[String, List[Expression] => Expression] = List(
+    "List.Max"
+  ).map(s => (s, transformation(s))).toMap
 }

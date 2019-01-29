@@ -19,4 +19,12 @@ trait RecordExpressionReducer extends Reducible {
       this.evaluate(scope)
     else
       ???
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    if (this.fieldList.isReducible(scope))
+      this.fieldList.nextReducible(scope)
+    else if (this.isEvaluable(scope))
+      Some(this)
+    else
+      None
 }

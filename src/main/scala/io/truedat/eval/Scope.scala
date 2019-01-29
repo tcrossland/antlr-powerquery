@@ -26,6 +26,15 @@ object Scope {
     }
     case _ => ???
   }
+
+  def extend(parent: Scope, parameterList: ParameterList, argumentList: ArgumentList): Scope = {
+    val fixedParameters = parameterList.fixedParameters.map(_.parameters.map(_.identifier)).getOrElse(List.empty)
+    val optionalParameters = parameterList.optionalParameters.map(_.parameters.map(_.identifier)).getOrElse(List.empty)
+    val fixedArgs = argumentList.expressions.take(fixedParameters.size)
+    val optionalArgs = argumentList.expressions.slice(fixedParameters.size, fixedParameters.size + optionalParameters.size)
+    val bindings = fixedParameters.zip(fixedArgs) ++ optionalParameters.zip(optionalArgs)
+    Scope(Some(parent), bindings.toMap)
+  }
 }
 
 case class Scope(parent: Option[Scope], bindings: Map[Identifier, Expression]) {

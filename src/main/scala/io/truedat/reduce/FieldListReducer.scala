@@ -24,4 +24,8 @@ trait FieldListReducer extends Reducible {
       case _ =>
         ???
     }
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    this.fields.find(_.isReducible(scope)).flatMap(_.nextReducible(scope))
+
 }

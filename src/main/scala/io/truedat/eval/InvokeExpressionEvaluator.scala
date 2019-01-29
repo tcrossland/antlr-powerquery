@@ -12,64 +12,34 @@ trait InvokeExpressionEvaluator extends Evaluable {
 
   def isFunctionIdentified: Expression => Boolean = expression =>
     expression.isInstanceOf[IdentifierExpression] ||
-      expression.isInstanceOf[IntrinsicFunction]
+      expression.isInstanceOf[FunctionExpression]
 
   override def evaluate: Scope => Expression = scope =>
     this.expression match {
-      case i: IntrinsicFunction =>
-        i match {
-          case IntrinsicTableFunction =>
-            TableFunctions.tableBuiltin(argumentList.expressions)
-          case _ =>
-            throw new IllegalArgumentException("Unhandled id: " + i.toString)
-        }
       case i: IdentifierExpression =>
         scope.closestBinding(i.identifier) match {
-          case Some(e: LetExpression) =>
+          case Some(_: LetExpression) =>
             Function(i.identifier.id)
           case None =>
             i.identifier.id match {
-              case "Date.Year" =>
-                DateFunctions.year(argumentList.expressions)
-              case "DateTime.LocalNow" =>
-                DateTimeFunctions.localNow(argumentList.expressions)
-              case "List.Max" =>
-                ListFunctions.max(argumentList.expressions)
-              case "Sql.Database" =>
-                DataAccessFunctions.dataSource(
-                  "Sql.Database",
-                  this.argumentList.expressions
-                )
-              case "DataLake.Contents" =>
-                  DataAccessFunctions.dataSource("DataLake.Contents", this.argumentList.expressions)
-              case "Table.ColumnNames" =>
-                TableFunctions.columnNames(argumentList.expressions)
-              case "Table.FromRecords" =>
-                TableFunctions.fromRecords(argumentList.expressions)
-              case "Table.RemoveColumns" =>
-                TableFunctions.removeColumns(argumentList.expressions)
-              case "Table.RenameColumns" =>
-                TableFunctions.renameColumns(argumentList.expressions)
-              case "Table.SelectColumns" =>
-                TableFunctions.selectColumns(argumentList.expressions)
-              case "Table.SelectRows" =>
-                TableFunctions.selectRows(argumentList.expressions)
-              case "Table.TransformColumnTypes" =>
-                TableFunctions.transformColumnTypes(argumentList.expressions)
-              case "Table.AddColumn" =>
-                TableFunctions.addColumn(argumentList.expressions)
-              case "Table.ExpandTableColumn" =>
-                TableFunctions.expandTableColumn(argumentList.expressions)
-              case "Table.DuplicateColumn" =>
-                TableFunctions.combine(argumentList.expressions) // TODO
-              case "Table.Combine" =>
-                TableFunctions.combine(argumentList.expressions)
-              case "Table.Group" =>
-                TableFunctions.combine(argumentList.expressions) // TODO
+              case fn if TableFunctions.functions.contains(fn) =>
+                TableFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if DateTimeFunctions.functions.contains(fn) =>
+                DateTimeFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if DataAccessFunctions.functions.contains(fn) =>
+                DataAccessFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if ListFunctions.functions.contains(fn) =>
+                ListFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if BinaryFunctions.functions.contains(fn) =>
+                BinaryFunctions.functions(fn).apply(argumentList.expressions)
               case id =>
                 throw new IllegalArgumentException("Unhandled id: " + id)
             }
         }
+      case f: FunctionExpression =>
+        // bind arguments to function parameters
+        val functionScope = Scope.extend(scope, f.parameterList, argumentList)
+        f.evaluate(functionScope)
       case e =>
         throw new IllegalArgumentException("Unhandled function: " + e.toString)
     }

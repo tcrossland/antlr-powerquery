@@ -8,6 +8,14 @@ trait LetExpressionReducer extends Reducible {
 
   def getScope: Scope => Scope = parentScope => Scope.extend(parentScope, this)
 
+  def alwaysTrue = () =>
+    true
+
+  override def isReduced: Boolean =
+    this.variableList.isReduced &&
+      this.expression.isReduced &&
+      alwaysTrue()
+
   override def isReducible: Scope => Boolean = parentScope => {
     val scope = getScope(parentScope)
     this.variableList.isReducible(scope) ||
@@ -24,5 +32,15 @@ trait LetExpressionReducer extends Reducible {
       logger.warn(this.toString)
       ???
     }
+  }
+
+  override def nextReducible: Scope => Option[Expression] = parentScope =>{
+    val scope = getScope(parentScope)
+    if (this.variableList.isReducible(scope))
+      this.variableList.nextReducible(scope)
+    else if (this.variableList.isReduced && this.expression.isReducible(scope))
+      Some(this)
+    else
+      None
   }
 }

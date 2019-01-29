@@ -22,4 +22,7 @@ trait ArgumentListReducer extends Reducible {
         logger.warn("No expression is reducible in " + this.toString)
         throw new IllegalArgumentException("No reducible expression")
     }
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    this.expressions.find(_.isReducible(scope)).flatMap(_.nextReducible(scope))
 }

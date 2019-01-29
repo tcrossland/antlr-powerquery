@@ -24,4 +24,14 @@ trait ItemSelectionReducer extends Reducible {
       this.evaluate(scope)
     else
       ???
+
+  override def nextReducible: Scope => Option[Expression] = scope =>
+    if (this.expression.isReducible(scope))
+      this.expression.nextReducible(scope)
+    else if (this.itemSelector.isReducible(scope))
+      this.itemSelector.nextReducible(scope)
+    else if (this.isEvaluable(scope))
+      Some(this)
+    else
+      None
 }

@@ -2,15 +2,15 @@ package io.truedat.functions
 
 import io.truedat.ast._
 
-object DataAccessFunctions {
+object DataAccessFunctions extends Functions {
 
-  def dataSource: (String, List[Expression]) => Expression = {
-    case (sourceType, args) =>
-      DataSource(
-        sourceType,
-        args
-      )
-    case _ =>
-      throw new IllegalArgumentException("Expected 1-4 arguments")
-  }
+  val functions: Map[String, List[Expression] => Expression] = List(
+    "Csv.Document",
+    "DataLake.Contents",
+    "Json.Document",
+    "Sql.Database"
+  ).map(s => (s, dataSource(s))).toMap
+
+  def dataSource: String => List[Expression] => Expression = source => args =>
+      DataSource(source, args)
 }

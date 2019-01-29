@@ -13,4 +13,7 @@ trait AsExpressionReducer extends Reducible {
 
   override def reduce: Scope => Expression = _ =>
     this.expression
+
+  override def nextReducible: Scope => Option[Expression] = _ =>
+    Some(this)
 }

@@ -18,17 +18,22 @@ object PowerQueryVisitor extends App {
   val visitor: PowerQueryVisitor = new PowerQueryVisitor()
   val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
 
-  var r: Section = doc
-  while (!r.isReduced) {
-    val s: Scope = Scope.create(r)
-    r = r.reduce(s).asInstanceOf[Section]
-    // logger.info(r.toString)
+  var section: Section = doc
+  var scope: Scope = Scope.create(section)
+  while (!section.isReduced && section.isReducible(scope)) {
+    logger.whenTraceEnabled {
+      val n: Option[Expression] = section.nextReducible(scope)
+      logger.trace(n.toString)
+    }
+
+    section = section.reduce(scope).asInstanceOf[Section]
+    scope = Scope.create(section)
   }
 
-  r.members
+  section.members
     .filter(_.expression.isInstanceOf[LineageElement])
-    .map(e => (e.name, e.expression))
-    .foreach(s => logger.info(s.toString))
+    .map(e => (e.name.id, e.expression.toString))
+    .foreach(x => logger.info(x._1 + " >> " + x._2))
 }
 
 class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaParserBaseVisitor[Node] {
@@ -478,7 +483,7 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
 
   override def visitIntrinsicFunctionExpression(ctx: IntrinsicFunctionExpressionContext): Node = {
     if (null != ctx.HASH_TABLE())
-      IntrinsicTableFunction
+      IdentifierExpression(Identifier("#table"))
     else
       ???
   }
@@ -495,7 +500,6 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
       case t => Some(visitReturnType(t))
     }
     val functionBody: Expression = visit(ctx.functionBody()).asInstanceOf[Expression]
-    // logger.info(FunctionExpression(parameterList, returnType, functionBody).toString)
     FunctionExpression(parameterList, returnType, functionBody)
   }
 

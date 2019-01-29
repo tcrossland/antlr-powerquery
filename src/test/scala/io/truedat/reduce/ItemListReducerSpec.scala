@@ -1,4 +1,4 @@
-package io.truedat
+package io.truedat.reduce
 
 import io.truedat.ast._
 import io.truedat.eval.Scope
