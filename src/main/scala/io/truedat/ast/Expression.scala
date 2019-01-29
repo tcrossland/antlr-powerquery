@@ -21,7 +21,7 @@ case class LogicalAndExpression(e1: Expression, e2: Expression) extends Expressi
 
 case class IsExpression(expression: Expression, is: Type) extends Expression
 
-case class AsExpression(expression: Expression, as: Type) extends Expression
+case class AsExpression(expression: Expression, as: Type) extends Expression with AsExpressionReducer
 
 case class EqualityExpression(op: Operator, e1: Expression, e2: Expression) extends Expression with EqualityExpressionReducer
 
@@ -49,7 +49,7 @@ case class OptionalItemSelection(expression: Expression, itemSelector: Expressio
 
 case class InvokeExpression(expression: Expression, argumentList: ArgumentList) extends Expression with InvokeExpressionReducer with InvokeExpressionEvaluator
 
-case class RecordExpression(fieldList: FieldList) extends Expression
+case class RecordExpression(fieldList: FieldList) extends Expression with RecordExpressionReducer with RecordExpressionEvaluator
 
 case class LetExpression(variableList: VariableList, expression: Expression) extends Expression with LetExpressionReducer
 
@@ -65,10 +65,10 @@ case class Variable(name: Identifier, expression: Expression) extends Expression
 
 case class TypeExpression(t: Type) extends Expression with TypeExpressionReducer
 
-case class Field(fieldName: Identifier, expression: Expression) extends Expression
+case class Field(fieldName: Identifier, expression: Expression) extends Expression with FieldReducer
 
-case class FieldList(fields: List[Field]) extends Expression {
-  override def toString: String = "Field" + fields.toString
+case class FieldList(fields: List[Field]) extends Expression with FieldListReducer {
+  // override def toString: String = "Field" + fields.toString
 }
 
 case class TableType(rowType: FieldSpecificationList) extends Type
@@ -193,12 +193,14 @@ case object FalseLiteral extends LogicalLiteral
 
 case object TrueLiteral extends LogicalLiteral
 
-case class RecordLiteral(value: List[LiteralField]) extends Value
+case class RecordLiteral(value: List[LiteralField] = List.empty) extends Value {
+  override def toString: String = "RecordLiteral()"
+}
 
 case class LiteralField(name: Identifier, value: Value) extends Value
 
-case class ListLiteral(value: List[Value]) extends Value {
-  override def toString: String = "Literal" + value.toString
+case class ListLiteral(value: List[Value] = List.empty) extends Value {
+  override def toString: String = "ListLiteral()"
 }
 
 case class NumberLiteral(value: String) extends Value

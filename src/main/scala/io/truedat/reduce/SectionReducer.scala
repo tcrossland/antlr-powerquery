@@ -1,6 +1,6 @@
 package io.truedat.reduce
 
-import io.truedat.ast.{ Expression, Section, SectionMember }
+import io.truedat.ast.{ Expression, LetExpression, Section, SectionMember }
 import io.truedat.eval.Scope
 
 trait SectionReducer extends Reducible {
@@ -15,11 +15,7 @@ trait SectionReducer extends Reducible {
   override def reduce: Scope => Expression = scope => {
     this.members.indexWhere(_.isReducible(scope)) match {
       case -1 =>
-        this.members
-          .filterNot(_.isReduced)
-          .take(1)
-          .map(m => m.copy(expression = m.expression))
-          .foreach(e => logger.warn(e.toString))
+        this.trace
         throw new IllegalArgumentException("No reducible members")
       case i =>
         val reducedMembers = this.members.splitAt(i) match {
@@ -29,4 +25,13 @@ trait SectionReducer extends Reducible {
         this.copy(members = reducedMembers)
     }
   }
+
+  def trace: Unit =
+    this.members.filterNot(_.isReduced) match {
+      case SectionMember(_, expression: LetExpression, _, _) :: _ =>
+        expression.variableList.variables.filterNot(_.isReduced).foreach(v => logger.warn(v.toString))
+      case m =>
+        logger.warn(m.toString)
+    }
+
 }
