@@ -8,36 +8,30 @@ trait LetExpressionReducer extends Reducible {
 
   def getScope: Scope => Scope = parentScope => Scope.extend(parentScope, this)
 
-  def alwaysTrue = () =>
-    true
-
   override def isReduced: Boolean =
     this.variableList.isReduced &&
-      this.expression.isReduced &&
-      alwaysTrue()
+      this.expression.isReduced
 
   override def isReducible: Scope => Boolean = parentScope => {
     val scope = getScope(parentScope)
-    this.variableList.isReducible(scope) ||
+    this.variableList.isReducible(parentScope) ||
       this.variableList.isReduced && this.expression.isReducible(scope)
   }
 
   override def reduce: Scope => Expression = parentScope => {
     val scope = getScope(parentScope)
-    if (this.variableList.isReducible(scope))
-      this.copy(variableList = this.variableList.reduce(scope).asInstanceOf[VariableList])
+    if (this.variableList.isReducible(parentScope))
+      this.copy(variableList = this.variableList.reduce(parentScope).asInstanceOf[VariableList])
     else if (this.variableList.isReduced && this.expression.isReducible(scope))
       this.expression.reduce(scope)
-    else {
-      logger.warn(this.toString)
+    else
       ???
-    }
   }
 
-  override def nextReducible: Scope => Option[Expression] = parentScope =>{
+  override def nextReducible: Scope => Option[Expression] = parentScope => {
     val scope = getScope(parentScope)
-    if (this.variableList.isReducible(scope))
-      this.variableList.nextReducible(scope)
+    if (this.variableList.isReducible(parentScope))
+      this.variableList.nextReducible(parentScope)
     else if (this.variableList.isReduced && this.expression.isReducible(scope))
       Some(this)
     else

@@ -3,6 +3,10 @@ package io.truedat.eval
 import io.truedat.ast._
 
 object Scope {
+  def empty(): Scope = Scope(None, Map.empty)
+
+  def fromMap(map: Map[Identifier, Expression]): Scope = Scope(None, map)
+
   def create(section: Section): Scope =
     Scope(None, section.members.map(m => (m.name, m.expression)).toMap)
 

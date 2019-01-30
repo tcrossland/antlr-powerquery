@@ -5,42 +5,25 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class InvokeExpressionReducerSpec extends FlatSpec {
+
   case class FixtureParam(expression: InvokeExpression, scope: Scope)
 
-  private def invokeExpressionWithFunctionExpression = new {
-    val functionReturn = DataSource("Baz", None)
-    val expression = InvokeExpression(
-      FunctionExpression(
-        ParameterList(
-          Some(
-            FixedParameterList(
-              List(
-                Parameter(Identifier("p1"),Some(BinaryType))
-              )
-            )
-          ),
-          None
-        ),
-        None,
-        functionReturn
-      ),
-      ArgumentList(
-        List(
-          RequiredFieldSelector(Identifier("Field"))
-        )
-      )
-    )
-    val scope = new Scope(None, Map.empty)
+  private def fixture = new {
+    val fixedParameterList = FixedParameterList(List(Parameter(Identifier("p1"), Some(BinaryType))))
+    val argumentList = ArgumentList(List(RequiredFieldSelector(Identifier("Field"))))
+    val functionBody = DataSource("Baz", List.empty)
+    val functionExpression = FunctionExpression(ParameterList(Some(fixedParameterList), None), None, functionBody)
+    val invokeExpression = InvokeExpression(functionExpression, argumentList)
   }
 
   "An InvokeExpression whose primary expression is FunctionExpression" should "be reducible" in {
-    val f = invokeExpressionWithFunctionExpression
-    assert(f.expression.isReducible(f.scope))
+    val f = fixture
+    assert(f.invokeExpression.isReducible(Scope.empty()))
   }
 
-  it should "reduce" in {
-    val f = invokeExpressionWithFunctionExpression
-    val e = f.expression.reduce(f.scope)
-    assert(e == f.functionReturn)
+  it should "reduce to the functions body" in {
+    val f = fixture
+    val reduced = f.invokeExpression.reduce(Scope.empty())
+    assert(reduced == f.functionBody)
   }
 }

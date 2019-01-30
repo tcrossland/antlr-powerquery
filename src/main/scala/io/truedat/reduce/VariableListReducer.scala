@@ -6,12 +6,17 @@ import io.truedat.eval.Scope
 trait VariableListReducer extends Reducible {
   this: VariableList =>
 
+  def getScope: Scope => Scope = parentScope => Scope.extend(parentScope, this)
+
   override def isReduced: Boolean = this.variables.forall(_.isReduced)
 
-  override def isReducible: Scope => Boolean = scope =>
+  override def isReducible: Scope => Boolean = parentScope => {
+    val scope = getScope(parentScope)
     this.variables.exists(_.isReducible(scope))
+  }
 
-  override def reduce: Scope => Expression = scope => {
+  override def reduce: Scope => Expression = parentScope => {
+    val scope = getScope(parentScope)
     this.variables.indexWhere(_.isReducible(scope)) match {
       case i if i > -1 =>
         val reducedVariables = this.variables.splitAt(i) match {
@@ -24,6 +29,9 @@ trait VariableListReducer extends Reducible {
     }
   }
 
-  override def nextReducible: Scope => Option[Expression] = scope =>
+  override def nextReducible: Scope => Option[Expression] = parentScope => {
+    val scope = getScope(parentScope)
     this.variables.find(_.isReducible(scope)).flatMap(_.nextReducible(scope))
+  }
+
 }
