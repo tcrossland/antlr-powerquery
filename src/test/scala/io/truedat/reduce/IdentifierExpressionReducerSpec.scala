@@ -5,6 +5,8 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class IdentifierExpressionReducerSpec extends FlatSpec {
+  import scala.language.reflectiveCalls
+
   private def fixture = new {
     val expression = IdentifierExpression(Identifier("Int64.Type"))
   }

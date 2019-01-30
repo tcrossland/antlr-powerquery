@@ -4,36 +4,41 @@ import com.typesafe.scalalogging.Logger
 import io.truedat.PowerQueryFormulaParser._
 import io.truedat.ast._
 import io.truedat.eval.Scope
+import io.truedat.parse.PowerQueryParser
 import org.antlr.v4.runtime.tree.{ ParseTree, ParseTreeProperty, TerminalNode }
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
-object PowerQueryVisitor extends App {
+object PowerQueryVisitor extends App with PowerQueryParser {
   val logger: Logger = Logger[PowerQueryVisitor]
 
-  val fileName: String = args.head
-  val parser: PowerQueryParser = new PowerQueryParser {}
-  val ctx: SectionDocumentContext = parser.parseFile(args.head)
-  val visitor: PowerQueryVisitor = new PowerQueryVisitor()
-  val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
+  args.foreach(visitFile)
 
-  var section: Section = doc
-  var scope: Scope = Scope.create(section)
-  while (!section.isReduced && section.isReducible(scope)) {
-    logger.whenTraceEnabled {
-      val n: Option[Expression] = section.nextReducible(scope)
-      logger.trace(n.toString)
+  def visitFile(fileName: String) = {
+    logger.info("▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Analyzing " + fileName + " ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒")
+    val ctx: SectionDocumentContext = this.parseFile(fileName)
+    val visitor: PowerQueryVisitor = new PowerQueryVisitor()
+    val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
+
+    var section: Section = doc
+    var scope: Scope = Scope.create(section)
+    while (!section.isReduced && section.isReducible(scope)) {
+      logger.whenTraceEnabled {
+        val n: Option[Expression] = section.nextReducible(scope)
+        logger.trace(n.toString)
+      }
+
+      section = section.reduce(scope).asInstanceOf[Section]
+      scope = Scope.create(section)
     }
 
-    section = section.reduce(scope).asInstanceOf[Section]
-    scope = Scope.create(section)
-  }
+    section.members
+      .filter(_.expression.isInstanceOf[LineageElement])
+      .map(e => (e.name.id, e.expression.toString))
+      .foreach(x => logger.info(x._1 + " >> " + x._2))
 
-  section.members
-    .filter(_.expression.isInstanceOf[LineageElement])
-    .map(e => (e.name.id, e.expression.toString))
-    .foreach(x => logger.info(x._1 + " >> " + x._2))
+  }
 }
 
 class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaParserBaseVisitor[Node] {

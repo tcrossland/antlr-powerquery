@@ -5,6 +5,7 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class InvokeExpressionReducerSpec extends FlatSpec {
+  import scala.language.reflectiveCalls
 
   case class FixtureParam(expression: InvokeExpression, scope: Scope)
 

@@ -5,6 +5,7 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class LetExpressionReducerSpec extends FlatSpec {
+  import scala.language.reflectiveCalls
 
   private def fixture= new {
     val functionId = "Sql.Database"

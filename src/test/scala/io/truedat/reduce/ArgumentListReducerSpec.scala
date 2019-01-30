@@ -5,6 +5,7 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class ArgumentListReducerSpec extends FlatSpec {
+  import scala.language.reflectiveCalls
 
   private def nestedItemListFixture = new {
     val itemList = ItemList(

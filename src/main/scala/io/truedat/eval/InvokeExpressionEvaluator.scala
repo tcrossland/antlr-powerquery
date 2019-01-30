@@ -32,9 +32,13 @@ trait InvokeExpressionEvaluator extends Evaluable {
                 ListFunctions.functions(fn).apply(argumentList.expressions)
               case fn if BinaryFunctions.functions.contains(fn) =>
                 BinaryFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if ValueFunctions.functions.contains(fn) =>
+                ValueFunctions.functions(fn).apply(argumentList.expressions)
               case id =>
                 throw new IllegalArgumentException("Unhandled id: " + id)
             }
+          case _ =>
+            ???
         }
       case f: FunctionExpression =>
         // bind arguments to function parameters

@@ -18,6 +18,8 @@ trait SectionReducer extends Reducible {
         val reducedMembers = this.members.splitAt(i) match {
           case (init, v :: tail) =>
             init ::: v.reduce(scope).asInstanceOf[SectionMember] :: tail
+          case _ =>
+            ???
         }
         this.copy(members = reducedMembers)
       case _ =>

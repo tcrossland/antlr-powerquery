@@ -5,6 +5,8 @@ import io.truedat.eval.Scope
 import org.scalatest.FlatSpec
 
 class ItemListReducerSpec extends FlatSpec {
+  import scala.language.reflectiveCalls
+
   private def itemListFixture = new {
     val itemList = ItemList(List(TextLiteral("FromDate"), IdentifierExpression(Identifier("Int64.Type"))))
   }
