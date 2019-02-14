@@ -3,7 +3,9 @@ package io.truedat
 import com.typesafe.scalalogging.Logger
 import io.truedat.PowerQueryFormulaParser._
 import io.truedat.ast._
+import io.truedat.csv.Writer
 import io.truedat.eval.Scope
+import io.truedat.extract.DictionaryContext
 import io.truedat.parse.PowerQueryParser
 import org.antlr.v4.runtime.tree.{ ParseTree, ParseTreeProperty, TerminalNode }
 
@@ -16,7 +18,9 @@ object PowerQueryVisitor extends App with PowerQueryParser {
   args.foreach(visitFile)
 
   def visitFile(fileName: String) = {
-    logger.info("▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Analyzing " + fileName + " ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒")
+    val reportName = fileName.split("/").last.replaceAll("_", " ").replaceAll(".m$", "")
+
+    logger.info("▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ Analyzing " + reportName + " ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒")
     val ctx: SectionDocumentContext = this.parseFile(fileName)
     val visitor: PowerQueryVisitor = new PowerQueryVisitor()
     val doc: Section = visitor.visit(ctx).asInstanceOf[Section]
@@ -33,11 +37,28 @@ object PowerQueryVisitor extends App with PowerQueryParser {
       scope = Scope.create(section)
     }
 
-    section.members
+    val tables = section.members
       .filter(_.expression.isInstanceOf[LineageElement])
-      .map(e => (e.name.id, e.expression.toString))
-      .foreach(x => logger.info(x._1 + " >> " + x._2))
 
+    /*
+    tables
+      .map(e => (e.name.id, e.expression.toString))
+      .sortBy(_._1)
+      .foreach(x => logger.info(x._1 + " <- " + x._2))
+    */
+
+
+    val tablesWithFields: List[(String, Set[String])] = tables
+      .map(m => (m.name.id, DictionaryContext.extractFields(m.expression)))
+
+    val writer = new Writer("./data/output", "LaLiga", reportName)
+    writer.write(tablesWithFields)
+
+    tablesWithFields
+      .sortBy(_._1)
+      .foreach {
+        case (name: String, fields: Set[String]) => logger.info(name + " CONTAINS " + fields.toList.sortBy(_.toLowerCase).mkString("[", ",", "]"))
+      }
   }
 }
 
@@ -161,8 +182,13 @@ class PowerQueryVisitor(autoReduce: Boolean = true) extends PowerQueryFormulaPar
     LiteralField(fieldName, value)
   }
 
-  override def visitAnyLiteral(ctx: AnyLiteralContext): Value =
-    super.visitAnyLiteral(ctx).asInstanceOf[Value]
+  override def visitAnyLiteral(ctx: AnyLiteralContext): Value = {
+    if (null != ctx.textLiteral()) {
+      visitTextLiteral(ctx.textLiteral())
+    } else {
+      super.visitAnyLiteral(ctx).asInstanceOf[Value]
+    }
+  }
 
   override def visitFieldName(ctx: FieldNameContext): Identifier = {
     readOptionalIdentifier(ctx.IDENTIFIER()).getOrElse(

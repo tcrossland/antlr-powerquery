@@ -6,34 +6,42 @@ import io.truedat.functions._
 trait InvokeExpressionEvaluator extends Evaluable {
   this: InvokeExpression =>
 
-  override def isEvaluable: Scope => Boolean = _ =>
-    isFunctionIdentified(this.expression) &&
-      this.argumentList.expressions.forall(_.isReduced)
+  override def isEvaluable: Scope => Boolean = scope =>
+    isFunctionIdentified &&
+      this.argumentList.expressions.forall(_.isReduced) &&
+      isFunctionEvaluable(scope)
 
-  def isFunctionIdentified: Expression => Boolean = expression =>
-    expression.isInstanceOf[IdentifierExpression] ||
-      expression.isInstanceOf[FunctionExpression]
+  def isFunctionIdentified: Boolean =
+    this.expression.isInstanceOf[IdentifierExpression] ||
+      this.expression.isInstanceOf[FunctionExpression]
+
+  def isFunctionEvaluable: Scope => Boolean = scope =>
+    this.expression match {
+      case _: FunctionExpression => true
+      case i: IdentifierExpression =>
+        scope.closestBinding(i.identifier) match {
+          case Some(e: LetExpression) =>
+            e.isReduced
+          case None =>
+            i.identifier.id match {
+              case fn if Functions.functions.contains(fn) => true
+              case _ => false
+            }
+          case _ => false
+        }
+      case _ => false
+    }
 
   override def evaluate: Scope => Expression = scope =>
     this.expression match {
       case i: IdentifierExpression =>
         scope.closestBinding(i.identifier) match {
-          case Some(_: LetExpression) =>
-            Function(i.identifier.id)
+          case Some(e: LetExpression) =>
+            e
           case None =>
             i.identifier.id match {
-              case fn if TableFunctions.functions.contains(fn) =>
-                TableFunctions.functions(fn).apply(argumentList.expressions)
-              case fn if DateTimeFunctions.functions.contains(fn) =>
-                DateTimeFunctions.functions(fn).apply(argumentList.expressions)
-              case fn if DataAccessFunctions.functions.contains(fn) =>
-                DataAccessFunctions.functions(fn).apply(argumentList.expressions)
-              case fn if ListFunctions.functions.contains(fn) =>
-                ListFunctions.functions(fn).apply(argumentList.expressions)
-              case fn if BinaryFunctions.functions.contains(fn) =>
-                BinaryFunctions.functions(fn).apply(argumentList.expressions)
-              case fn if ValueFunctions.functions.contains(fn) =>
-                ValueFunctions.functions(fn).apply(argumentList.expressions)
+              case fn if Functions.functions.contains(fn) =>
+                Functions.functions(fn).apply(argumentList.expressions)
               case id =>
                 throw new IllegalArgumentException("Unhandled id: " + id)
             }

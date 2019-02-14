@@ -21,10 +21,11 @@ class ArgumentListReducerSpec extends FlatSpec {
     private val itemListFixture = nestedItemListFixture
 
     import itemListFixture._
+    import io.truedat.functions.`Sql.Database`
 
     val argumentList = ArgumentList(
       List(
-        DataSource("Foo", List.empty),
+        ItemSelection(`Sql.Database`(List.empty), RecordLiteral(List.empty)),
         itemList,
         TextLiteral("en-US")
       )

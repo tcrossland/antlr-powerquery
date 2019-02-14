@@ -5,7 +5,10 @@ import io.truedat.ast._
 trait FunctionExpressionEvaluator extends Evaluable {
   this: FunctionExpression =>
 
-  override def isEvaluable: Scope => Boolean = _ => ???
+  override def isEvaluable: Scope => Boolean = scope => {
+    val e = this
+    ???
+  }
 
   override def evaluate: Scope => Expression = scope =>
     if (this.functionBody.isReduced)

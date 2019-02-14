@@ -12,16 +12,13 @@ trait ItemSelectionReducer extends Reducible {
 
   override def isReducible: Scope => Boolean = scope =>
     this.expression.isReducible(scope) ||
-      this.itemSelector.isReducible(scope) ||
-      this.isEvaluable(scope)
+      this.itemSelector.isReducible(scope)
 
   override def reduce: Scope => Expression = scope =>
     if (this.expression.isReducible(scope))
       this.copy(expression = this.expression.reduce(scope))
     else if (this.itemSelector.isReducible(scope))
       this.copy(itemSelector = this.itemSelector.reduce(scope))
-    else if (this.isEvaluable(scope))
-      this.evaluate(scope)
     else
       ???
 
@@ -30,8 +27,6 @@ trait ItemSelectionReducer extends Reducible {
       this.expression.nextReducible(scope)
     else if (this.itemSelector.isReducible(scope))
       this.itemSelector.nextReducible(scope)
-    else if (this.isEvaluable(scope))
-      Some(this)
     else
       None
 }

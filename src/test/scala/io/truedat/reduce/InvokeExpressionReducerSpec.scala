@@ -2,9 +2,11 @@ package io.truedat.reduce
 
 import io.truedat.ast._
 import io.truedat.eval.Scope
+import io.truedat.functions.`Sql.Database`
 import org.scalatest.FlatSpec
 
 class InvokeExpressionReducerSpec extends FlatSpec {
+
   import scala.language.reflectiveCalls
 
   case class FixtureParam(expression: InvokeExpression, scope: Scope)
@@ -12,7 +14,7 @@ class InvokeExpressionReducerSpec extends FlatSpec {
   private def fixture = new {
     val fixedParameterList = FixedParameterList(List(Parameter(Identifier("p1"), Some(BinaryType))))
     val argumentList = ArgumentList(List(RequiredFieldSelector(Identifier("Field"))))
-    val functionBody = DataSource("Baz", List.empty)
+    val functionBody = ItemSelection(`Sql.Database`(List.empty), RecordLiteral(List.empty))
     val functionExpression = FunctionExpression(ParameterList(Some(fixedParameterList), None), None, functionBody)
     val invokeExpression = InvokeExpression(functionExpression, argumentList)
   }

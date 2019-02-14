@@ -2,6 +2,7 @@ package io.truedat.reduce
 
 import io.truedat.ast._
 import io.truedat.eval.Scope
+import io.truedat.functions.`Sql.Database`
 import org.scalatest.FlatSpec
 
 class VariableListReducerSpec extends FlatSpec {
@@ -64,7 +65,7 @@ class VariableListReducerSpec extends FlatSpec {
         List(
           Variable(
             Identifier("Source"),
-            DataSource(f.functionId, List(TextLiteral(f.hostName)))
+            `Sql.Database`(List(TextLiteral(f.hostName)))
           ),
           Variable(
             Identifier("SourceRef"),
@@ -81,11 +82,11 @@ class VariableListReducerSpec extends FlatSpec {
         List(
           Variable(
             Identifier("Source"),
-            DataSource(f.functionId, List(TextLiteral(f.hostName)))
+            `Sql.Database`(List(TextLiteral(f.hostName)))
           ),
           Variable(
             Identifier("SourceRef"),
-            DataSource(f.functionId, List(TextLiteral(f.hostName)))
+            `Sql.Database`(List(TextLiteral(f.hostName)))
           )
         )
       ),

@@ -2,6 +2,7 @@ package io.truedat.reduce
 
 import io.truedat.ast._
 import io.truedat.eval.Scope
+import io.truedat.functions.`Sql.Database`
 import org.scalatest.FlatSpec
 
 class LetExpressionReducerSpec extends FlatSpec {
@@ -72,7 +73,7 @@ class LetExpressionReducerSpec extends FlatSpec {
           List(
             Variable(
               Identifier("Source"),
-              DataSource(f.functionId, List(TextLiteral(f.hostName)))
+              `Sql.Database`(List(TextLiteral(f.hostName)))
             ),
             Variable(
               Identifier("SourceRef"),
@@ -91,11 +92,11 @@ class LetExpressionReducerSpec extends FlatSpec {
           List(
             Variable(
               Identifier("Source"),
-              DataSource(f.functionId, List(TextLiteral(f.hostName)))
+              `Sql.Database`(List(TextLiteral(f.hostName)))
             ),
             Variable(
               Identifier("SourceRef"),
-              DataSource(f.functionId, List(TextLiteral(f.hostName)))
+              `Sql.Database`(List(TextLiteral(f.hostName)))
             )
           )
         ),
@@ -105,7 +106,7 @@ class LetExpressionReducerSpec extends FlatSpec {
     assert(e3.isReducible(Scope.extend(f.scope, e3)))
     val e4 = e3.reduce(Scope.extend(f.scope, e3))
     assert(e4 ==
-      DataSource(f.functionId, List(TextLiteral(f.hostName)))
+      `Sql.Database`(List(TextLiteral(f.hostName)))
     )
 
     assert(e4.isReduced)

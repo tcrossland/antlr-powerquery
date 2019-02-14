@@ -2,9 +2,10 @@ package io.truedat.functions
 
 import io.truedat.ast._
 
-object ValueFunctions extends Functions {
-
-  val functions: Map[String, List[Expression] => Expression] = List(
-    "Value.NativeQuery"
-  ).map(s => (s, transformation(s))).toMap
+object ValueFunctions {
+  val functions: Map[String, List[Expression] => Expression] = Map(
+    "Value.NativeQuery" -> `Value.NativeQuery`.apply
+  )
 }
+
+case class `Value.NativeQuery`(args: List[Expression]) extends LibraryFunction

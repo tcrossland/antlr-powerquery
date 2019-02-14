@@ -23,6 +23,10 @@ dependencies {
   compile group: 'org.antlr', name: 'antlr4-runtime', version: '4.7.2'
   compile group: 'org.scala-lang', name: 'scala-library', version: '2.12.8'
   compile group: 'com.typesafe.scala-logging', name: 'scala-logging_2.12', version: '3.9.2'
+  compile group: 'com.nrinaudo', name: 'kantan.csv_2.12', version: '0.5.0'
+  compile group: 'com.nrinaudo', name: 'kantan.csv-generic_2.12', version: '0.5.0'
+  compile group: 'com.chuusai', name: 'shapeless_2.12', version: '2.3.3'
+  compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.8.1'
   testCompile 'junit:junit:4.12'
   testCompile group: 'org.scalatest', name: 'scalatest_2.12', version: '3.0.5'
   testRuntime 'org.pegdown:pegdown:1.4.2'
@@ -53,7 +57,7 @@ compileScala {
   scalaCompileOptions.additionalParameters = ["-feature"]
 }
 compileTestScala {
-  scalaCompileOptions.additionalParameters = ["-feature"]
+  scalaCompileOptions.additionalParameters = ["-feature", "-Ypatmat-exhaust-depth", "off"]
 }
 
 

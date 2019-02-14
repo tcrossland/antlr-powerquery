@@ -2,10 +2,12 @@ package io.truedat.functions
 
 import io.truedat.ast._
 
-object BinaryFunctions extends Functions {
-
-  val functions: Map[String, List[Expression] => Expression] = List(
-    "Binary.Decompress",
-    "Binary.FromText"
-  ).map(s => (s, transformation(s))).toMap
+object BinaryFunctions {
+  val functions: Map[String, List[Expression] => Expression] = Map(
+    "Binary.Decompress" -> `Binary.Decompress`.apply,
+    "Binary.FromText" -> `Binary.FromText`.apply
+  )
 }
+
+case class `Binary.Decompress`(args: List[Expression]) extends LibraryFunction
+case class `Binary.FromText`(args: List[Expression]) extends LibraryFunction
